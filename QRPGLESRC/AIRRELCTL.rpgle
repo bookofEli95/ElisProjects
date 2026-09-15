@@ -58,9 +58,9 @@
      D WrkPickPut      S              1A
 
      D WrkSbmJob       S            114A   Inz('SBMJOB CMD(CALL PGM(PLCCHKSGL) -
-     D                                          PARM(''xxxxxx'')) JOB(SDOC_xxx) JOBD-
-     D                                          (OPERATOR) OUTQ(HP1N) DATE(xxxxxx-
-     D                                          ) MSGQ(*NONE)')
+     D                                          PARM(''xxxxxx'')) JOB(SDOC_xxx)-
+     D                                           JOBD(OPERATOR) OUTQ(HP1N) DATE-
+     D                                          (xxxxxx) MSGQ(*NONE)')
      D WrkLength       S             15  5 Inz(114)
 
        //***********************************************************************
