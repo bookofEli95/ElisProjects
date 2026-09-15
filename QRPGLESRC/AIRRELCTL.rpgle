@@ -28,8 +28,9 @@
       /copy qcopysrc,odrbldtype
       /copy qcopysrc,oerrelas
 
-     D OERSDDAT        PR
-     D  PrmSdatc                     6A
+       Dcl-PR OERSDDAT ExtPgm('OERSDDAT');
+         PrmSdatc Char(6);
+       End-PR;
 
        //***********************************************************************
        //* Entry Parameters *
