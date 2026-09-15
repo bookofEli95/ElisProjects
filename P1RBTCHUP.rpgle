@@ -332,15 +332,12 @@
             Jf7_CompleteYY = 0;
             Jf7_TrnQty     = 0;
             Jf7_InForm     = *Blanks;
-            Jf7_Fill01     = 0;
             Jf7_CloseMM    = 0;
             Jf7_CloseDD    = 0;
             Jf7_CloseYY    = 0;
             Jf7_FinQty     = 0;
             Jf7_UFEO       = ' ';
             Jf7_Close      = ' ';
-            Jf7_Task1120   = 0;
-            Jf7_Task1130   = 0;
             Write WW$JOBAC;
 
             // 8. Write Production Rerun Master (RERUN8)
@@ -489,7 +486,7 @@
             PrmReruna     = ' ';
             Prm$Ldesc     = STG_TITLE;
             PrmDivcat     = %Char(WrkDivCat);
-            PrmRorefNum2  = STG_ROREF;
+            PrmRorefNum2  = %Editc(STG_ROREF : 'X');
             Callp IVRASKWD(IVRASKWDDS);
 
             // 12. Write PCR Breakeven Master (PCPBKEVN)
@@ -595,7 +592,7 @@
                PrmReruna     = ' ';
                Prm$Ldesc     = Itm_Ldesc;
                PrmDivcat     = %Char(WrkDivCat);
-               PrmRorefNum2  = STG_ROREF;
+               PrmRorefNum2  = %Editc(STG_ROREF : 'X');
                Callp IVRASKWD(IVRASKWDDS);
             Endif;
 
