@@ -200,7 +200,7 @@
             Out PCDINQRY;
 
             // 5. Map and Write to PCR Master (PCPMAIN)
-            Clear PCPMAINS;
+            Clear PCPMAIN$;
             @Itm        = WrkNewItm;
             Jobnum7     = WrkNewJob;
             Divcat      = WrkDivcat;
@@ -275,7 +275,7 @@
             @Send       = 'N';
             BusAff      = 'N';
             @Wino       = ' ';
-            Write PCPMAINS;
+            Write PCPMAIN$;
 
             // 6. Calculate Accrual Rate & Write to PCPROYLT
             Exsr Sbr_Update_Roy_Accrual_Rate;
