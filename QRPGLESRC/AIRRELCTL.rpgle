@@ -54,14 +54,8 @@
 
      D PrmOrdnum       S              8A
      D PrmSdatc        S              6A
-     D WrkSddtea       S              6A
      D WrkPickPut      S              1A
-
-     D WrkSbmJob       S            114A   Inz('SBMJOB CMD(CALL PGM(PLCCHKSGL) -
-     D                                          PARM(''xxxxxx'')) JOB(SDOC_xxx)-
-     D                                           JOBD(OPERATOR) OUTQ(HP1N) DATE-
-     D                                          (xxxxxx) MSGQ(*NONE)')
-     D WrkLength       S             15  5 Inz(114)
+     D WrkCommand      S           1024A
 
        //***********************************************************************
        //* Main Line *
@@ -142,18 +136,24 @@
          // the DPPDAYS calendar unless the batch is Rush or Milwaukee -
          // same rule OERSLSD applies for a manual release).
          callp OERSDDAT(PrmSdatc);
-         WrkSddtea = PrmSdatc;
 
          // Submit PLCCHKSGL with the ship-doc date, same as OERSLSD -
          // PLCCHKSGL decides pick/put single-line handling and P&S-only
          // routing before it submits OECPRTSD itself.
-         %Subst(WrkSbmJob:57:3) = $E#1;
-         %Subst(WrkSbmJob:38:6) = WrkSddtea;
-         %Subst(WrkSbmJob:96:6) = WrkSddtea;
-
-         Call 'QCMDEXC'
-           Parm WrkSbmJob
-           Parm WrkLength
+         WrkCommand = 'SBMJOB CMD(CALL PGM(PLCCHKSGL) '
+                     + 'PARM('''
+                     + PrmSdatc
+                     + ''')) '
+                     + 'JOB(SDOC_'
+                     + $E#1
+                     + ') '
+                     + 'OUTQ(HP1N) '
+                     + 'JOBD(OPERATOR) '
+                     + 'DATE('
+                     + PrmSdatc
+                     + ') '
+                     + 'MSGQ(*NONE)';
+         callp QCMDEXC(%Trim(WrkCommand):%Len(%Trim(WrkCommand)));
        Endsr;
 
        //***********************************************************************
