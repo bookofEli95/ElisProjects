@@ -16,8 +16,8 @@
       // Project   Date     Int Description
       // ------- -------- --- ---------------------------------------------
       // EFIFIX  08/18/26 EFI Create initial upload RPGLE program
-      // EFIFIX  09/14/26 EFI Fix STG_ prefix trim, ROY_ field-name collision,
-      //                      and convert calculations to fixed-form C-specs
+      // EFIFIX  09/15/26 EFI Fix STG_ prefix trim and ROY_ field-name
+      //                      collision; calculations in /free block
       // ******************************************************************
 
       //Input Files
@@ -126,7 +126,6 @@
      D WrkPos          S              3S 0 Inz(0)
      D WrkDate         S               D
      D WrkMktCoord     S             10A    Inz(*Blanks)
-     D WrkMsg          S             40A
 
      D WrkTmppr2       S              7S 4 Inz(0)
      D WrkTmpacm       S              9S 4 Inz(0)
@@ -145,528 +144,532 @@
       //***********************************************************************
       //* MAIN LINE
       //***********************************************************************
-     C                   READ      PCRSTAGE
-     C                   DOW       NOT %Eof(PCRSTAGE)
+      /free
 
-      * 1. Extract Numeric Divcat from Staging Column
-     C                   EVAL      WrkPos = %Scan(' ':STG_CAT)
-     C                   IF        WrkPos > 0
-     C                   EVAL      WrkDivCatChar = %Trim(%Subst(STG_CAT:1:WrkPos
-     C                             - 1))
-     C                   MONITOR
-     C                   EVAL      WrkDivCat = %Int(WrkDivCatChar)
-     C                   ON-ERROR
-     C                   EVAL      WrkDivCat = 0
-     C                   ENDMON
-     C                   ELSE
-     C                   MONITOR
-     C                   EVAL      WrkDivCat = %Int(STG_CAT)
-     C                   ON-ERROR
-     C                   EVAL      WrkDivCat = 0
-     C                   ENDMON
-     C                   ENDIF
+         Read PCRSTAGE;
+         Dow Not %Eof(PCRSTAGE);
 
-      * 2. Generate New Job Number
-     C                   EVAL      PrmJobnum7 = *Blanks
-     C                   CALLP     P1RGETJOB(PrmJobnum7)
-     C                   EVAL      WrkNewJob = %Int(PrmJobnum7)
+            // 1. Extract Numeric Divcat from Staging Column
+            WrkPos = %Scan(' ' : STG_CAT);
+            If WrkPos > 0;
+               WrkDivCatChar = %Trim(%Subst(STG_CAT : 1 : WrkPos - 1));
+               Monitor;
+                  WrkDivCat = %Int(WrkDivCatChar);
+               On-Error;
+                  WrkDivCat = 0;
+               Endmon;
+            Else;
+               Monitor;
+                  WrkDivCat = %Int(STG_CAT);
+               On-Error;
+                  WrkDivCat = 0;
+               Endmon;
+            Endif;
 
-      * 3. Generate New Item Number
-     C                   EVAL      PrmNextItm = *Blanks
-     C                   EVAL      PrmScorItm = *Blanks
-     C                   EVAL      PrmError = *Blanks
-     C                   EVAL      PrmScore = STG_SCSLT
-     C                   EVAL      PrmKit = STG_KIT
-     C                   EVAL      PrmBill = 'N'
-     C                   EVAL      PrmDivCat = %Editc(WrkDivCat:'X')
-     C                   EVAL      PrmBillItm = *Blanks
-     C                   CALLP     IVRGETITMN(PrmNextItm:PrmScorItm:PrmError:
-     C                             PrmScore:PrmKit:PrmBill:PrmDivCat:PrmBillItm)
-     C                   EVAL      WrkNewItm = %Int(PrmNextItm)
+            // 2. Generate New Job Number
+            PrmJobnum7 = *Blanks;
+            Callp P1RGETJOB(PrmJobnum7);
+            WrkNewJob = %Int(PrmJobnum7);
 
-      * 4. Data Area Tracking
-     C     *LOCK         IN        PCDINQRY
-     C                   EVAL      Pcd_Itmnum = WrkNewItm
-     C                   EVAL      Pcd_Jobnum7 = WrkNewJob
-     C                   EVAL      Pcd_DivCat = WrkDivCat
-     C                   EVAL      Pcd_ExpCd = 'GEN'
-     C                   EVAL      Pcd_NewAdd = 'A'
-     C                   OUT       PCDINQRY
+            // 3. Generate New Item Number
+            PrmNextItm = *Blanks;
+            PrmScorItm = *Blanks;
+            PrmError   = *Blanks;
+            PrmScore   = STG_SCSLT;
+            PrmKit     = STG_KIT;
+            PrmBill    = 'N';
+            PrmDivCat  = %Editc(WrkDivCat : 'X');
+            PrmBillItm = *Blanks;
+            Callp IVRGETITMN( PrmNextItm
+                            : PrmScorItm
+                            : PrmError
+                            : PrmScore
+                            : PrmKit
+                            : PrmBill
+                            : PrmDivCat
+                            : PrmBillItm );
+            WrkNewItm = %Int(PrmNextItm);
 
-      * 5. Map and Write to PCR Master (PCPMAIN)
-     C                   CLEAR     PCPMAINS
-     C                   EVAL      @Itm = WrkNewItm
-     C                   EVAL      Jobnum7 = WrkNewJob
-     C                   EVAL      Divcat = WrkDivcat
-     C                   EVAL      LDesc1 = %Subst(STG_TITLE:1:29)
-     C                   EVAL      LDesc2 = %Subst(STG_TITLE:30:29)
-     C                   EVAL      LDesc3 = %Subst(STG_TITLE:59:29)
-     C                   EVAL      Sdesc = STG_SDESC
-     C                   EVAL      Price72 = STG_PRICE
-     C                   EVAL      Price112 = STG_PRICE
-     C                   EVAL      RunQty = STG_RUNQTY
-     C                   EVAL      Series = STG_SERIES
-     C                   EVAL      Cntrtp = STG_CNTRTP
-     C                   EVAL      Medium = STG_MEDIUM
-     C                   EVAL      CtryOrigin = STG_CTRY
-     C                   EVAL      Voicng = STG_VOICNG
-     C                   EVAL      MaxDis = STG_MAXDIS
-     C                   EVAL      Rorefnum = STG_ROREF
-     C                   EVAL      Pblshrnum = STG_PUBLSHR
-     C                   EVAL      Artist = STG_ARTIST
-     C                   EVAL      Arrngr = STG_ARRNGR
-     C                   EVAL      Author = STG_AUTHOR
-     C                   EVAL      PublCode = STG_PUBLCOD
-     C                   EVAL      PubCode = STG_PUBCODE
-     C                   EVAL      Catlog = STG_CATLOG
-     C                   EVAL      @Catl1 = STG_CATL1
-     C                   EVAL      @Catl2 = STG_CATL2
-     C                   EVAL      MusKey = STG_MUSKEY
-     C                   EVAL      @Purch = STG_PURCH
-     C                   EVAL      @Kit = STG_KIT
-     C                   EVAL      @Rush = STG_RUSH
-     C                   EVAL      @Outs = STG_OUTS
-     C                   EVAL      @Splt = STG_SPLT
-     C                   EVAL      Sellbl = STG_SELLBL
-     C                   EVAL      @UPC = STG_UPC
-     C                   EVAL      @EAN# = STG_EAN
-     C                   EVAL      @ISBN = STG_ISBN
-     C                   EVAL      @NI = STG_NI
-     C                   EVAL      NICat1 = STG_NICAT1
-     C                   EVAL      NICat2 = STG_NICAT2
-     C                   EVAL      NICat3 = STG_NICAT3
-     C                   EVAL      @SCSLT = STG_SCSLT
-     C                   EVAL      @SCQty = STG_SCQTY
-     C                   EVAL      @SCPRC72 = STG_SCPRC
-     C                   EVAL      @SCPRC112 = STG_SCPRC
-     C                   EVAL      Clinic# = STG_CLINIC
+            // 4. Data Area Tracking
+            In *Lock PCDINQRY;
+            Pcd_Itmnum  = WrkNewItm;
+            Pcd_Jobnum7 = WrkNewJob;
+            Pcd_DivCat  = WrkDivCat;
+            Pcd_ExpCd   = 'GEN';
+            Pcd_NewAdd  = 'A';
+            Out PCDINQRY;
 
-     C                   IF        STG_ESTCMP <> *Blanks
-     C                   MONITOR
-     C                   EVAL      WrkDate = %Date(STG_ESTCMP:*ISO)
-     C                   EVAL      EstCmpMM = %Subdt(WrkDate:*M)
-     C                   EVAL      EstCmpDD = %Subdt(WrkDate:*D)
-     C                   EVAL      EstCmpYYYY = %Subdt(WrkDate:*Y)
-     C                   EVAL      EstCmpDt = WrkDate
-     C                   ON-ERROR
-     C                   EVAL      EstCmpMM = 0
-     C                   EVAL      EstCmpDD = 0
-     C                   EVAL      EstCmpYYYY = 0
-     C                   EVAL      EstCmpDt = *Loval
-     C                   ENDMON
-     C                   ELSE
-     C                   EVAL      EstCmpMM = 0
-     C                   EVAL      EstCmpDD = 0
-     C                   EVAL      EstCmpYYYY = 0
-     C                   EVAL      EstCmpDt = *Loval
-     C                   ENDIF
+            // 5. Map and Write to PCR Master (PCPMAIN)
+            Clear PCPMAINS;
+            @Itm        = WrkNewItm;
+            Jobnum7     = WrkNewJob;
+            Divcat      = WrkDivcat;
+            LDesc1      = %Subst(STG_TITLE : 1 : 29);
+            LDesc2      = %Subst(STG_TITLE : 30 : 29);
+            LDesc3      = %Subst(STG_TITLE : 59 : 29);
+            Sdesc       = STG_SDESC;
+            Price72     = STG_PRICE;
+            Price112    = STG_PRICE;
+            RunQty      = STG_RUNQTY;
+            Series      = STG_SERIES;
+            Cntrtp      = STG_CNTRTP;
+            Medium      = STG_MEDIUM;
+            CtryOrigin  = STG_CTRY;
+            Voicng      = STG_VOICNG;
+            MaxDis      = STG_MAXDIS;
+            Rorefnum    = STG_ROREF;
+            Pblshrnum   = STG_PUBLSHR;
+            Artist      = STG_ARTIST;
+            Arrngr      = STG_ARRNGR;
+            Author      = STG_AUTHOR;
+            PublCode    = STG_PUBLCOD;
+            PubCode     = STG_PUBCODE;
+            Catlog      = STG_CATLOG;
+            @Catl1      = STG_CATL1;
+            @Catl2      = STG_CATL2;
+            MusKey      = STG_MUSKEY;
+            @Purch      = STG_PURCH;
+            @Kit        = STG_KIT;
+            @Rush       = STG_RUSH;
+            @Outs       = STG_OUTS;
+            @Splt       = STG_SPLT;
+            Sellbl      = STG_SELLBL;
+            @UPC        = STG_UPC;
+            @EAN#       = STG_EAN;
+            @ISBN       = STG_ISBN;
+            @NI         = STG_NI;
+            NICat1      = STG_NICAT1;
+            NICat2      = STG_NICAT2;
+            NICat3      = STG_NICAT3;
+            @SCSLT      = STG_SCSLT;
+            @SCQty      = STG_SCQTY;
+            @SCPRC72    = STG_SCPRC;
+            @SCPRC112   = STG_SCPRC;
+            Clinic#     = STG_CLINIC;
 
-     C                   EVAL      StartMM = %Subdt(%Date():*M)
-     C                   EVAL      StartDD = %Subdt(%Date():*D)
-     C                   EVAL      StartYYYY = %Subdt(%Date():*Y)
-     C                   EVAL      StartDt = %Date()
-     C                   EVAL      Orign = SdsUser
-     C                   EVAL      @Send = 'N'
-     C                   EVAL      BusAff = 'N'
-     C                   EVAL      @Wino = ' '
-     C                   WRITE     PCPMAINS
+            If STG_ESTCMP <> *Blanks;
+               Monitor;
+                  WrkDate = %Date(STG_ESTCMP : *ISO);
+                  EstCmpMM   = %Subdt(WrkDate : *M);
+                  EstCmpDD   = %Subdt(WrkDate : *D);
+                  EstCmpYYYY = %Subdt(WrkDate : *Y);
+                  EstCmpDt   = WrkDate;
+               On-Error;
+                  EstCmpMM   = 0;
+                  EstCmpDD   = 0;
+                  EstCmpYYYY = 0;
+                  EstCmpDt   = *Loval;
+               Endmon;
+            Else;
+               EstCmpMM   = 0;
+               EstCmpDD   = 0;
+               EstCmpYYYY = 0;
+               EstCmpDt   = *Loval;
+            Endif;
 
-      * 6. Calculate Accrual Rate & Write to PCPROYLT
-     C                   EXSR      SbrRoyAcr
-     C                   CLEAR     PCPROYL$
-     C                   EVAL      ROY_@Itm = WrkNewItm
-     C                   EVAL      ROY_Jobnum7 = WrkNewJob
-     C                   EVAL      ROY_CODEPR72 = STG_PRICE
-     C                   EVAL      ROY_AcrRate = WrkAcrRate
-     C                   EVAL      ROY_Jvrte = WrkJvRate
-     C                   EVAL      ROY_SNGRTE = STG_SNGRTE
-     C                   EVAL      ROY_SNGADV = STG_SNGADV
-     C                   EVAL      ROY_SNFPAY = STG_SNFPAY
-     C                   EVAL      ROY_CMPRTE = STG_CMPRTE
-     C                   EVAL      ROY_CMPADV = STG_CMPADV
-     C                   EVAL      ROY_CMPPAY = STG_CMPPAY
-     C                   EVAL      ROY_ARRRTE = STG_ARRRTE
-     C                   EVAL      ROY_ARRADV = STG_ARRADV
-     C                   EVAL      ROY_ARRPAY = STG_ARRPAY
-     C                   EVAL      ROY_IMGRTE = STG_IMGRTE
-     C                   EVAL      ROY_IMGADV = STG_IMGADV
-     C                   EVAL      ROY_IMGPAY = STG_IMGPAY
-     C                   EVAL      ROY_OTHRTE = STG_OTHRTE
-     C                   EVAL      ROY_OTHADV = STG_OTHADV
-     C                   EVAL      ROY_OTHPAY = STG_OTHPAY
-     C                   EVAL      ROY_AGCRTE = STG_AGCRTE
-     C                   EVAL      ROY_AGCADV = STG_AGCADV
-     C                   EVAL      ROY_AGCPAY = STG_AGCPAY
-     C                   EVAL      ROY_MECFEE = STG_MECFEE
-     C                   EVAL      ROY_MECADV = STG_MECADV
-     C                   EVAL      ROY_MECPAY = STG_MECPAY
-     C                   EVAL      ROY_OTHFEE = STG_OTHFEE
-     C                   EVAL      ROY_OTHFAD = STG_OTHFAD
-     C                   EVAL      ROY_OTHFPY = STG_OTHFPY
-     C                   EVAL      ROY_ARRFEE = STG_ARRFEE
-     C                   EVAL      ROY_ARRFPY = STG_ARRFPY
-     C                   EVAL      ROY_JVPC = STG_JVPC
-     C                   EVAL      ROY_JVADV = STG_JVADV
-     C                   EVAL      ROY_JVPAY = STG_JVPAY
-     C                   WRITE     PCPROYL$
+            StartMM     = %Subdt(%Date() : *M);
+            StartDD     = %Subdt(%Date() : *D);
+            StartYYYY   = %Subdt(%Date() : *Y);
+            StartDt     = %Date();
+            Orign       = SdsUser;
+            @Send       = 'N';
+            BusAff      = 'N';
+            @Wino       = ' ';
+            Write PCPMAINS;
 
-      * 7. Write Production Job Master (JOBFLE7)
-     C                   CLEAR     WW$JOBAC
-     C                   EVAL      Jf7_Jobnum7 = WrkNewJob
-     C                   EVAL      Jf7_Fininv = %Editc(WrkNewItm:'X')
-     C                   EVAL      Jf7_Itmnumnew = WrkNewItm
-     C                   EVAL      Jf7_Jobdes = %Trim(STG_SERIES) + ' ' +
-     C                             STG_SDESC
-     C                   EVAL      Jf7_RunQty = STG_RUNQTY
-     C                   EVAL      Jf7_RunId = 'NW'
-     C                   EVAL      Jf7_StartMM = %Subdt(%Date():*M)
-     C                   EVAL      Jf7_StartDD = %Subdt(%Date():*D)
-     C                   EVAL      Jf7_StartYY = %Subdt(%Date():*Y)
-     C                   EVAL      Jf7_CompleteMM = 0
-     C                   EVAL      Jf7_CompleteDD = 0
-     C                   EVAL      Jf7_CompleteYY = 0
-     C                   EVAL      Jf7_TrnQty = 0
-     C                   EVAL      Jf7_InForm = *Blanks
-     C                   EVAL      Jf7_Fill01 = 0
-     C                   EVAL      Jf7_CloseMM = 0
-     C                   EVAL      Jf7_CloseDD = 0
-     C                   EVAL      Jf7_CloseYY = 0
-     C                   EVAL      Jf7_FinQty = 0
-     C                   EVAL      Jf7_UFEO = ' '
-     C                   EVAL      Jf7_Close = ' '
-     C                   EVAL      Jf7_Task1120 = 0
-     C                   EVAL      Jf7_Task1130 = 0
-     C                   WRITE     WW$JOBAC
+            // 6. Calculate Accrual Rate & Write to PCPROYLT
+            Exsr Sbr_Update_Roy_Accrual_Rate;
+            Clear PCPROYL$;
+            ROY_@Itm     = WrkNewItm;
+            ROY_Jobnum7  = WrkNewJob;
+            ROY_CODEPR72 = STG_PRICE;
+            ROY_AcrRate  = WrkAcrRate;
+            ROY_Jvrte    = WrkJvRate;
+            ROY_SNGRTE   = STG_SNGRTE;
+            ROY_SNGADV   = STG_SNGADV;
+            ROY_SNFPAY   = STG_SNFPAY;
+            ROY_CMPRTE   = STG_CMPRTE;
+            ROY_CMPADV   = STG_CMPADV;
+            ROY_CMPPAY   = STG_CMPPAY;
+            ROY_ARRRTE   = STG_ARRRTE;
+            ROY_ARRADV   = STG_ARRADV;
+            ROY_ARRPAY   = STG_ARRPAY;
+            ROY_IMGRTE   = STG_IMGRTE;
+            ROY_IMGADV   = STG_IMGADV;
+            ROY_IMGPAY   = STG_IMGPAY;
+            ROY_OTHRTE   = STG_OTHRTE;
+            ROY_OTHADV   = STG_OTHADV;
+            ROY_OTHPAY   = STG_OTHPAY;
+            ROY_AGCRTE   = STG_AGCRTE;
+            ROY_AGCADV   = STG_AGCADV;
+            ROY_AGCPAY   = STG_AGCPAY;
+            ROY_MECFEE   = STG_MECFEE;
+            ROY_MECADV   = STG_MECADV;
+            ROY_MECPAY   = STG_MECPAY;
+            ROY_OTHFEE   = STG_OTHFEE;
+            ROY_OTHFAD   = STG_OTHFAD;
+            ROY_OTHFPY   = STG_OTHFPY;
+            ROY_ARRFEE   = STG_ARRFEE;
+            ROY_ARRFPY   = STG_ARRFPY;
+            ROY_JVPC     = STG_JVPC;
+            ROY_JVADV    = STG_JVADV;
+            ROY_JVPAY    = STG_JVPAY;
+            Write PCPROYL$;
 
-      * 8. Write Production Rerun Master (RERUN8)
-     C                   CLEAR     B$RERUN
-     C                   EVAL      Rr8_ITEM# = WrkNewItm
-     C                   EVAL      Rr8_Jobnum7 = WrkNewJob
-     C                   EVAL      Rr8_RunQty = STG_RUNQTY
-     C                   EVAL      Rr8_Delete = *Blanks
-     C                   EVAL      Rr8_FinishMM = EstCmpMM
-     C                   EVAL      Rr8_FinishDD = EstCmpDD
-     C                   EVAL      Rr8_FinishYYYY = EstCmpYYYY
-     C                   EVAL      Rr8_Coment = *Blanks
-     C                   EVAL      Rr8_Compdt = (%Subdt(%Date():*M) * 100) +
-     C                             %Subdt(%Date():*D)
-     C                   EVAL      Rr8_Photdt = 0
-     C                   EVAL      Rr8_Presdt = 0
-     C                   EVAL      Rr8_Binddt = 0
-     C                   EVAL      Rr8_Xtrcmt = *Blanks
-     C                   EVAL      Rr8_Bochkd = *Blanks
-     C                   EVAL      Rr8_Prepdt = 0
-     C                   EVAL      Rr8_Scandt = 0
-     C                   EVAL      Rr8_Prntdt = 0
-     C                   EVAL      Rr8_DgBinddt = 0
-     C                   WRITE     B$RERUN
-     C                   CALLP     PCRRERN(Rr8_ITEM#)
+            // 7. Write Production Job Master (JOBFLE7)
+            Clear WW$JOBAC;
+            Jf7_Jobnum7    = WrkNewJob;
+            Jf7_Fininv     = %Editc(WrkNewItm : 'X');
+            Jf7_Itmnumnew  = WrkNewItm;
+            Jf7_Jobdes     = %Trim(STG_SERIES) + ' ' + STG_SDESC;
+            Jf7_RunQty     = STG_RUNQTY;
+            Jf7_RunId      = 'NW';
+            Jf7_StartMM    = %Subdt(%Date() : *M);
+            Jf7_StartDD    = %Subdt(%Date() : *D);
+            Jf7_StartYY    = %Subdt(%Date() : *Y);
+            Jf7_CompleteMM = 0;
+            Jf7_CompleteDD = 0;
+            Jf7_CompleteYY = 0;
+            Jf7_TrnQty     = 0;
+            Jf7_InForm     = *Blanks;
+            Jf7_Fill01     = 0;
+            Jf7_CloseMM    = 0;
+            Jf7_CloseDD    = 0;
+            Jf7_CloseYY    = 0;
+            Jf7_FinQty     = 0;
+            Jf7_UFEO       = ' ';
+            Jf7_Close      = ' ';
+            Jf7_Task1120   = 0;
+            Jf7_Task1130   = 0;
+            Write WW$JOBAC;
 
-      * 9. Write Online Rerun Queue (IVPORRITM & IVPORRMNT)
-     C                   CLEAR     IV$ORRITM
-     C                   EVAL      Orr_Itmnum = WrkNewItm
-     C                   EVAL      Orr_MinQtyDt = %Date()
-     C                   EVAL      Orr_Note1 =
-     C                             'PCR created job (not Online Rerun)'
-     C                   EVAL      Orr_RerunSts = 'J'
-     C                   EVAL      Orr_Hold = *Blanks
-     C                   EVAL      Orr_Jobnum7 = WrkNewJob
-     C                   EVAL      Orr_Jobdate = %Date()
-     C                   EVAL      Orr_Jobuser = SdsUser
-     C                   WRITE     IV$ORRITM
+            // 8. Write Production Rerun Master (RERUN8)
+            Clear B$RERUN;
+            Rr8_ITEM#      = WrkNewItm;
+            Rr8_Jobnum7    = WrkNewJob;
+            Rr8_RunQty     = STG_RUNQTY;
+            Rr8_Delete     = *Blanks;
+            Rr8_FinishMM   = EstCmpMM;
+            Rr8_FinishDD   = EstCmpDD;
+            Rr8_FinishYYYY = EstCmpYYYY;
+            Rr8_Coment     = *Blanks;
+            Rr8_Compdt     = (%Subdt(%Date():*M) * 100) + %Subdt(%Date():*D);
+            Rr8_Photdt     = 0;
+            Rr8_Presdt     = 0;
+            Rr8_Binddt     = 0;
+            Rr8_Xtrcmt     = *Blanks;
+            Rr8_Bochkd     = *Blanks;
+            Rr8_Prepdt     = 0;
+            Rr8_Scandt     = 0;
+            Rr8_Prntdt     = 0;
+            Rr8_DgBinddt   = 0;
+            Write B$RERUN;
+            Callp PCRRERN(Rr8_ITEM#);
 
-     C                   CLEAR     IV$ORRMNT
-     C                   EVAL      Orm_Itmnum = WrkNewItm
-     C                   EVAL      Orm_Action = 'Job created'
-     C                   EVAL      Orm_Desc = 'Job# ' + %Trim(%Editc(WrkNewJob:
-     C                             'X'))
-     C                   EVAL      Orm_MaintTs = %Timestamp()
-     C                   EVAL      Orm_MaintWho = SdsUser
-     C                   WRITE     IV$ORRMNT
+            // 9. Write Online Rerun Queue (IVPORRITM & IVPORRMNT)
+            Clear IV$ORRITM;
+            Orr_Itmnum   = WrkNewItm;
+            Orr_MinQtyDt = %Date();
+            Orr_Note1    = 'PCR created job (not Online Rerun)';
+            Orr_RerunSts = 'J';
+            Orr_Hold     = *Blanks;
+            Orr_Jobnum7  = WrkNewJob;
+            Orr_Jobdate  = %Date();
+            Orr_Jobuser  = SdsUser;
+            Write IV$ORRITM;
 
-      * 10. Write Inventory Item Master (IVPITEMS)
-     C                   CLEAR     IVPITEM$
-     C                   EVAL      Itm_Itmnum = WrkNewItm
-     C                   EVAL      Itm_Divcat = WrkDivCat
-     C                   EVAL      Itm_Series = STG_SERIES
-     C                   EVAL      Itm_Sdesc = %Trim(STG_SERIES) + ' ' +
-     C                             STG_SDESC
-     C                   EVAL      Itm_Ldesc = STG_TITLE
-     C                   EVAL      Itm_Arrngr = STG_ARRNGR
-     C                   EVAL      Itm_Artist = STG_ARTIST
-     C                   EVAL      Itm_Author = STG_AUTHOR
-     C                   EVAL      Itm_Catlog = STG_CATLOG
-     C                   EVAL      Itm_Medium = STG_MEDIUM
-     C                   EVAL      Itm_PblshrNum = STG_PUBLSHR
-     C                   EVAL      Itm_RorefNum = STG_ROREF
-     C                   EVAL      Itm_Voicng = STG_VOICNG
-     C                   EVAL      Itm_Pubcode = STG_PUBCODE
-     C                   EVAL      Itm_Maxdis = STG_MAXDIS
-     C                   IF        STG_MAXDIS = 9.999
-     C                   EVAL      Itm_Net = 'Y'
-     C                   ELSE
-     C                   EVAL      Itm_Net = 'N'
-     C                   ENDIF
-     C                   EVAL      Itm_Price72 = STG_PRICE
-     C                   EVAL      Itm_Price112 = STG_PRICE
-     C                   IF        STG_KIT = 'Y'
-     C                   EVAL      Itm_Kit = 'K'
-     C                   ELSE
-     C                   EVAL      Itm_Kit = ' '
-     C                   ENDIF
+            Clear IV$ORRMNT;
+            Orm_Itmnum   = WrkNewItm;
+            Orm_Action   = 'Job created';
+            Orm_Desc     = 'Job# ' + %Trim(%Editc(WrkNewJob : 'X'));
+            Orm_MaintTs  = %Timestamp();
+            Orm_MaintWho = SdsUser;
+            Write IV$ORRMNT;
 
-     C                   EVAL      WrkMktCoord = *Blanks
-     C                   CALLP     IVRORRGETC(%Editc(WrkNewItm:'X'):WrkMktCoord)
-     C                   SELECT
-     C                   WHEN      STG_MEDIUM = 'SITLC'
-     C                   EVAL      Itm_Permot = *Blanks
-     C                   WHEN      STG_SERIES = 'SI'
-     C                   EVAL      Itm_Permot = 'S'
-     C                   WHEN      WrkMktCoord = 'IMPORT'
-     C                   EVAL      Itm_Permot = 'B'
-     C                   OTHER
-     C                   EVAL      Itm_Permot = 'Y'
-     C                   ENDSL
+            // 10. Write Inventory Item Master (IVPITEMS)
+            Clear IVPITEM$;
+            Itm_Itmnum     = WrkNewItm;
+            Itm_Divcat     = WrkDivCat;
+            Itm_Series     = STG_SERIES;
+            Itm_Sdesc      = %Trim(STG_SERIES) + ' ' + STG_SDESC;
+            Itm_Ldesc      = STG_TITLE;
+            Itm_Arrngr     = STG_ARRNGR;
+            Itm_Artist     = STG_ARTIST;
+            Itm_Author     = STG_AUTHOR;
+            Itm_Catlog     = STG_CATLOG;
+            Itm_Medium     = STG_MEDIUM;
+            Itm_PblshrNum  = STG_PUBLSHR;
+            Itm_RorefNum   = STG_ROREF;
+            Itm_Voicng     = STG_VOICNG;
+            Itm_Pubcode    = STG_PUBCODE;
+            Itm_Maxdis     = STG_MAXDIS;
+            If STG_MAXDIS = 9.999;
+               Itm_Net = 'Y';
+            Else;
+               Itm_Net = 'N';
+            Endif;
+            Itm_Price72    = STG_PRICE;
+            Itm_Price112   = STG_PRICE;
+            If STG_KIT = 'Y';
+               Itm_Kit = 'K';
+            Else;
+               Itm_Kit = ' ';
+            Endif;
 
-     C                   EVAL(H)   Itm_Minqty = STG_RUNQTY / 3
-     C                   IF        Itm_Minqty = 0
-     C                   EVAL      Itm_Minqty = 1
-     C                   ENDIF
+            WrkMktCoord = *Blanks;
+            Callp IVRORRGETC(%Editc(WrkNewItm : 'X') : WrkMktCoord);
+            Select;
+            When STG_MEDIUM = 'SITLC';
+               Itm_Permot = *Blanks;
+            When STG_SERIES = 'SI';
+               Itm_Permot = 'S';
+            When WrkMktCoord = 'IMPORT';
+               Itm_Permot = 'B';
+            Other;
+               Itm_Permot = 'Y';
+            Endsl;
 
-     C                   IF        STG_SELLBL = 'S' OR STG_MEDIUM = 'DLD' OR
-     C                             STG_MEDIUM = 'VIDDL'
-     C                   EVAL      Itm_MinQtyUsg = 'I'
-     C                   ENDIF
+            Eval(H) Itm_Minqty = STG_RUNQTY / 3;
+            If Itm_Minqty = 0;
+               Itm_Minqty = 1;
+            Endif;
 
-     C                   EVAL      Itm_Stdtyp = 'N'
-     C                   EVAL      Itm_Sellbl = STG_SELLBL
-     C                   EVAL      Itm_Cntrtp = STG_CNTRTP
-     C                   EVAL      Itm_Muskey = STG_MUSKEY
-     C                   EVAL      Itm_Publcode = STG_PUBLCOD
-     C                   EVAL      Itm_CtryOrigin = STG_CTRY
-     C                   EVAL      Itm_NIYN = STG_NI
-     C                   EVAL      Itm_Nicat1 = STG_NICAT1
-     C                   EVAL      Itm_Nicat2 = STG_NICAT2
-     C                   EVAL      Itm_Nicat3 = STG_NICAT3
-     C                   EVAL      Itm_Cprtun = 1
-     C                   EVAL      Itm_Reruna = ' '
-     C                   EVAL      Itm_Cexcpt = ' '
-     C                   EVAL      Itm_RoyAcrRat1 = WrkAcrRate
-     C                   WRITE     IVPITEM$
+            If STG_SELLBL = 'S' or STG_MEDIUM = 'DLD' or STG_MEDIUM = 'VIDDL';
+               Itm_MinQtyUsg = 'I';
+            Endif;
 
-      * 11. Barcodes, Alpha Search, Audit & Sales
-     C                   IF        STG_UPC = 'Y'
-     C                   EVAL      Itm_Upc# = 0
-     C                   EVAL      Itm_Check# = 0
-     C                   CALLP     UPC#2(Itm_Itmnum:Itm_Upc#:Itm_Check#)
-     C                   ENDIF
+            Itm_Stdtyp     = 'N';
+            Itm_Sellbl     = STG_SELLBL;
+            Itm_Cntrtp     = STG_CNTRTP;
+            Itm_Muskey     = STG_MUSKEY;
+            Itm_Publcode   = STG_PUBLCOD;
+            Itm_CtryOrigin = STG_CTRY;
+            Itm_NIYN       = STG_NI;
+            Itm_Nicat1     = STG_NICAT1;
+            Itm_Nicat2     = STG_NICAT2;
+            Itm_Nicat3     = STG_NICAT3;
+            Itm_Cprtun     = 1;
+            Itm_Reruna     = ' ';
+            Itm_Cexcpt     = ' ';
+            Itm_RoyAcrRat1 = WrkAcrRate;
+            Write IVPITEM$;
 
-     C                   IF        STG_ISBN = 'Y'
-     C                   CALLP     PCRISBN()
-     C                   ENDIF
+            // 11. Barcodes, Alpha Search, Audit & Sales
+            If STG_UPC = 'Y';
+               Itm_Upc#   = 0;
+               Itm_Check# = 0;
+               Callp UPC#2(Itm_Itmnum : Itm_Upc# : Itm_Check#);
+            Endif;
 
-     C                   CALLP     P1R999S()
+            If STG_ISBN = 'Y';
+               Callp PCRISBN();
+            Endif;
 
-     C                   CLEAR     ROPSALE$
-     C                   EVAL      Rsl_Itmnum = WrkNewItm
-     C                   WRITE     ROPSALE$
+            Callp P1R999S();
 
-     C                   CLEAR     IVPMAIN$
-     C                   EVAL      Mnt_Itmnum = WrkNewItm
-     C                   EVAL      Mnt_Fldnam = 'ADDED'
-     C                   EVAL      Mnt_MaintYYYY = %Subdt(%Date():*Y)
-     C                   EVAL      Mnt_Maintmm = %Subdt(%Date():*M)
-     C                   EVAL      Mnt_Maintdd = %Subdt(%Date():*D)
-     C                   EVAL      Mnt_Maintwho = SdsUser
-     C                   EVAL      Mnt_Before = '***** ITEM ADDED ************'
-     C                   EVAL      Mnt_After = '***** ITEM ADDED ************'
-     C                   EVAL      Mnt_Repcode = 'N'
-     C                   EVAL      Mnt_Comment = *Blanks
-     C                   WRITE     IVPMAIN$
+            Clear ROPSALE$;
+            Rsl_Itmnum = WrkNewItm;
+            Write ROPSALE$;
 
-     C                   EVAL      Prm$Itmnu = WrkNewItm
-     C                   EVAL      PrmDelete = ' '
-     C                   EVAL      PrmReruna = ' '
-     C                   EVAL      Prm$Ldesc = STG_TITLE
-     C                   EVAL      PrmDivcat = %Char(WrkDivCat)
-     C                   EVAL      PrmRorefNum2 = STG_ROREF
-     C                   CALLP     IVRASKWD(IVRASKWDDS)
+            Clear IVPMAIN$;
+            Mnt_Itmnum    = WrkNewItm;
+            Mnt_Fldnam    = 'ADDED';
+            Mnt_MaintYYYY = %Subdt(%Date() : *Y);
+            Mnt_Maintmm   = %Subdt(%Date() : *M);
+            Mnt_Maintdd   = %Subdt(%Date() : *D);
+            Mnt_Maintwho  = SdsUser;
+            Mnt_Before    = '***** ITEM ADDED ************';
+            Mnt_After     = '***** ITEM ADDED ************';
+            Mnt_Repcode   = 'N';
+            Mnt_Comment   = *Blanks;
+            Write IVPMAIN$;
 
-      * 12. Write PCR Breakeven Master (PCPBKEVN)
-     C                   CLEAR     PCPBKEV$
-     C                   EVAL      Bke_@Itm = WrkNewItm
-     C                   EVAL      Bke_Jobnum7 = WrkNewJob
-     C                   EVAL      Bke_BKE00172 = STG_PRICE
-     C                   SELECT
-     C                   WHEN      STG_MAXDIS = 0
-     C                   EVAL      Bke_BKE002 = 0.47
-     C                   WHEN      STG_MAXDIS = 9.999
-     C                   EVAL      Bke_BKE002 = 1.0
-     C                   OTHER
-     C                   EVAL      Bke_BKE002 = 1 - STG_MAXDIS
-     C                   ENDSL
-     C                   EVAL      Bke_BKE00572 = 0
-     C                   EVAL      Bke_BKE006 = WrkAcrRate
-     C                   EVAL      Bke_BKE008 = 0
-     C                   EVAL      Bke_BKE014 = 0
-     C                   WRITE     PCPBKEV$
+            Prm$Itmnu     = WrkNewItm;
+            PrmDelete     = ' ';
+            PrmReruna     = ' ';
+            Prm$Ldesc     = STG_TITLE;
+            PrmDivcat     = %Char(WrkDivCat);
+            PrmRorefNum2  = STG_ROREF;
+            Callp IVRASKWD(IVRASKWDDS);
 
-      * 13. Conditional: Purchased Product Flag (IVPITMCODE)
-     C                   IF        STG_PURCH = 'Y'
-     C                   EVAL      Cod_Itmnum = WrkNewItm
-     C                   EVAL      Cod_ItmCode = 'PUR'
-     C                   WRITE     IVSITMCODE
-     C                   ENDIF
+            // 12. Write PCR Breakeven Master (PCPBKEVN)
+            Clear PCPBKEV$;
+            Bke_@Itm     = WrkNewItm;
+            Bke_Jobnum7  = WrkNewJob;
+            Bke_BKE00172 = STG_PRICE;
+            Select;
+            When STG_MAXDIS = 0;
+               Bke_BKE002 = 0.47;
+            When STG_MAXDIS = 9.999;
+               Bke_BKE002 = 1.0;
+            Other;
+               Bke_BKE002 = 1 - STG_MAXDIS;
+            Endsl;
+            Bke_BKE00572 = 0;
+            Bke_BKE006   = WrkAcrRate;
+            Bke_BKE008   = 0;
+            Bke_BKE014   = 0;
+            Write PCPBKEV$;
 
-      * 14. Conditional: Score Item & Slot (W#JOBSCR & IVPITEMS)
-     C                   IF        STG_SCSLT = 'Y' AND PrmScorItm <> *Blanks AND
-     C                             %Int(PrmScorItm) <> 0
-     C                   EVAL      WrkScoreItm = %Int(PrmScorItm)
-     C                   EVAL      Scr_Jobnum7 = WrkNewJob
-     C                   EVAL      Scr_Scrnum = WrkScoreItm
-     C                   EVAL      Scr_Scrqty = STG_SCQTY
-     C                   WRITE     WSJOBSCR
+            // 13. Conditional: Purchased Product Flag (IVPITMCODE)
+            If STG_PURCH = 'Y';
+               Cod_Itmnum  = WrkNewItm;
+               Cod_ItmCode = 'PUR';
+               Write IVSITMCODE;
+            Endif;
 
-     C                   CLEAR     IVPITEM$
-     C                   EVAL      Itm_Itmnum = WrkScoreItm
-     C                   EVAL      Itm_Divcat = WrkDivCat
-     C                   EVAL      Itm_Series = STG_SERIES
-     C                   EVAL      Itm_Voicng = 'SCORE'
-     C                   EVAL      Itm_Price72 = STG_SCPRC
-     C                   EVAL      Itm_Price112 = STG_SCPRC
-     C                   EVAL      Itm_Ldesc = %TrimR(STG_TITLE) + ' FULL SCORE'
-     C                   EVAL      Itm_Sdesc = %TrimR(STG_SDESC) + ' SC'
-     C                   EVAL      Itm_Arrngr = STG_ARRNGR
-     C                   EVAL      Itm_Artist = STG_ARTIST
-     C                   EVAL      Itm_Author = STG_AUTHOR
-     C                   EVAL      Itm_Catlog = STG_CATLOG
-     C                   EVAL      Itm_Medium = STG_MEDIUM
-     C                   EVAL      Itm_PblshrNum = STG_PUBLSHR
-     C                   EVAL      Itm_RorefNum = STG_ROREF
-     C                   EVAL      Itm_Pubcode = STG_PUBCODE
-     C                   EVAL      Itm_Maxdis = STG_MAXDIS
-     C                   IF        STG_MAXDIS = 9.999
-     C                   EVAL      Itm_Net = 'Y'
-     C                   ELSE
-     C                   EVAL      Itm_Net = 'N'
-     C                   ENDIF
-     C                   EVAL      Itm_Kit = ' '
-     C                   EVAL(H)   Itm_Minqty = STG_SCQTY / 3
-     C                   IF        Itm_Minqty = 0
-     C                   EVAL      Itm_Minqty = 1
-     C                   ENDIF
-     C                   EVAL      Itm_Stdtyp = 'N'
-     C                   EVAL      Itm_Cntrtp = 'S'
-     C                   EVAL      Itm_Cexcpt = 'Z'
-     C                   EVAL      Itm_NIYN = 'N'
-     C                   EVAL      Itm_Reruna = ' '
-     C                   EVAL      Itm_Cprtun = 1
-     C                   EVAL      Itm_Sellbl = STG_SELLBL
-     C                   EVAL      Itm_Muskey = STG_MUSKEY
-     C                   EVAL      Itm_Publcode = STG_PUBLCOD
-     C                   EVAL      Itm_CtryOrigin = STG_CTRY
-     C                   WRITE     IVPITEM$
+            // 14. Conditional: Score Item & Slot (W#JOBSCR & IVPITEMS)
+            If STG_SCSLT = 'Y' and PrmScorItm <> *Blanks and %Int(PrmScorItm)
+             <> 0;
+               WrkScoreItm = %Int(PrmScorItm);
+               Scr_Jobnum7 = WrkNewJob;
+               Scr_Scrnum  = WrkScoreItm;
+               Scr_Scrqty  = STG_SCQTY;
+               Write WSJOBSCR;
 
-     C                   IF        STG_UPC = 'Y'
-     C                   EVAL      Itm_Upc# = 0
-     C                   EVAL      Itm_Check# = 0
-     C                   CALLP     UPC#2(Itm_Itmnum:Itm_Upc#:Itm_Check#)
-     C                   ENDIF
+               Clear IVPITEM$;
+               Itm_Itmnum     = WrkScoreItm;
+               Itm_Divcat     = WrkDivCat;
+               Itm_Series     = STG_SERIES;
+               Itm_Voicng     = 'SCORE';
+               Itm_Price72    = STG_SCPRC;
+               Itm_Price112   = STG_SCPRC;
+               Itm_Ldesc      = %TrimR(STG_TITLE) + ' FULL SCORE';
+               Itm_Sdesc      = %TrimR(STG_SDESC) + ' SC';
+               Itm_Arrngr     = STG_ARRNGR;
+               Itm_Artist     = STG_ARTIST;
+               Itm_Author     = STG_AUTHOR;
+               Itm_Catlog     = STG_CATLOG;
+               Itm_Medium     = STG_MEDIUM;
+               Itm_PblshrNum  = STG_PUBLSHR;
+               Itm_RorefNum   = STG_ROREF;
+               Itm_Pubcode    = STG_PUBCODE;
+               Itm_Maxdis     = STG_MAXDIS;
+               If STG_MAXDIS = 9.999;
+                  Itm_Net = 'Y';
+               Else;
+                  Itm_Net = 'N';
+               Endif;
+               Itm_Kit        = ' ';
+               Eval(H) Itm_Minqty = STG_SCQTY / 3;
+               If Itm_Minqty = 0;
+                  Itm_Minqty = 1;
+               Endif;
+               Itm_Stdtyp     = 'N';
+               Itm_Cntrtp     = 'S';
+               Itm_Cexcpt     = 'Z';
+               Itm_NIYN       = 'N';
+               Itm_Reruna     = ' ';
+               Itm_Cprtun     = 1;
+               Itm_Sellbl     = STG_SELLBL;
+               Itm_Muskey     = STG_MUSKEY;
+               Itm_Publcode   = STG_PUBLCOD;
+               Itm_CtryOrigin = STG_CTRY;
+               Write IVPITEM$;
 
-     C                   CLEAR     ROPSALE$
-     C                   EVAL      Rsl_Itmnum = WrkScoreItm
-     C                   WRITE     ROPSALE$
+               If STG_UPC = 'Y';
+                  Itm_Upc#   = 0;
+                  Itm_Check# = 0;
+                  Callp UPC#2(Itm_Itmnum : Itm_Upc# : Itm_Check#);
+               Endif;
 
-     C                   CLEAR     IVPMAIN$
-     C                   EVAL      Mnt_Itmnum = WrkScoreItm
-     C                   EVAL      Mnt_Fldnam = 'ADDED'
-     C                   EVAL      Mnt_MaintYYYY = %Subdt(%Date():*Y)
-     C                   EVAL      Mnt_Maintmm = %Subdt(%Date():*M)
-     C                   EVAL      Mnt_Maintdd = %Subdt(%Date():*D)
-     C                   EVAL      Mnt_Maintwho = SdsUser
-     C                   EVAL      Mnt_Before = '***** ITEM ADDED ************'
-     C                   EVAL      Mnt_After = '***** ITEM ADDED ************'
-     C                   EVAL      Mnt_Repcode = 'N'
-     C                   EVAL      Mnt_Comment = *Blanks
-     C                   WRITE     IVPMAIN$
+               Clear ROPSALE$;
+               Rsl_Itmnum = WrkScoreItm;
+               Write ROPSALE$;
 
-     C                   EVAL      Prm$Itmnu = WrkScoreItm
-     C                   EVAL      PrmDelete = ' '
-     C                   EVAL      PrmReruna = ' '
-     C                   EVAL      Prm$Ldesc = Itm_Ldesc
-     C                   EVAL      PrmDivcat = %Char(WrkDivCat)
-     C                   EVAL      PrmRorefNum2 = STG_ROREF
-     C                   CALLP     IVRASKWD(IVRASKWDDS)
-     C                   ENDIF
+               Clear IVPMAIN$;
+               Mnt_Itmnum    = WrkScoreItm;
+               Mnt_Fldnam    = 'ADDED';
+               Mnt_MaintYYYY = %Subdt(%Date() : *Y);
+               Mnt_Maintmm   = %Subdt(%Date() : *M);
+               Mnt_Maintdd   = %Subdt(%Date() : *D);
+               Mnt_Maintwho  = SdsUser;
+               Mnt_Before    = '***** ITEM ADDED ************';
+               Mnt_After     = '***** ITEM ADDED ************';
+               Mnt_Repcode   = 'N';
+               Mnt_Comment   = *Blanks;
+               Write IVPMAIN$;
 
-      * Advance loop to next row
-     C                   READ      PCRSTAGE
-     C                   ENDDO
+               Prm$Itmnu     = WrkScoreItm;
+               PrmDelete     = ' ';
+               PrmReruna     = ' ';
+               Prm$Ldesc     = Itm_Ldesc;
+               PrmDivcat     = %Char(WrkDivCat);
+               PrmRorefNum2  = STG_ROREF;
+               Callp IVRASKWD(IVRASKWDDS);
+            Endif;
 
-     C                   EVAL      WrkMsg =
-     C                             'Batch upload processed successfully.'
-     C                   DSPLY     WrkMsg
-     C                   EVAL      *INLR = *ON
+            // Advance loop to next row
+            Read PCRSTAGE;
+         Enddo;
 
-      * Subroutine: Calculate Total Royalty Accrual Rate
-     C     SbrRoyAcr     BEGSR
+         DSPLY 'Batch upload processed successfully.';
+         *InLr = *On;
 
-     C     STG_ROREF     CHAIN     ROLOWCTL1
-     C                   IF        NOT %Found(ROLOWCTL1)
-     C                   EVAL      Ctl_AdmFee = 0
-     C                   ENDIF
+      /end-free
 
-     C                   IF        STG_PRICE <> 0
-     C                   EVAL      WrkTmppr2 = STG_PRICE / 100
-     C                   ELSE
-     C                   EVAL      WrkTmppr2 = 0
-     C                   ENDIF
+      //***********************************************************************
+      //* Subroutine: Calculate Total Royalty Accrual Rate
+      //***********************************************************************
+      /free
+         Begsr Sbr_Update_Roy_Accrual_Rate;
 
-     C                   EVAL      WrkTmpacm = STG_SNGRTE * WrkTmppr2
-     C                   EVAL      WrkJvs01 = WrkTmpacm
-     C                   EVAL      WrkAcrRate = WrkTmpacm
+            Chain (STG_ROREF) ROLOWCTL1;
+            If Not %Found(ROLOWCTL1);
+               Ctl_AdmFee = 0;
+            Endif;
 
-     C                   EVAL      WrkTmpacm = STG_CMPRTE * WrkTmppr2
-     C                   EVAL      WrkJvs02 = WrkTmpacm
-     C                   EVAL      WrkAcrRate = WrkAcrRate + WrkTmpacm
+            If STG_PRICE <> 0;
+               WrkTmppr2 = STG_PRICE / 100;
+            Else;
+               WrkTmppr2 = 0;
+            Endif;
 
-     C                   EVAL      WrkTmpacm = STG_ARRRTE * WrkTmppr2
-     C                   EVAL      WrkJvs03 = WrkTmpacm
-     C                   EVAL      WrkAcrRate = WrkAcrRate + WrkTmpacm
+            WrkTmpacm   = STG_SNGRTE * WrkTmppr2;
+            WrkJvs01    = WrkTmpacm;
+            WrkAcrRate  = WrkTmpacm;
 
-     C                   EVAL      WrkTmpacm = STG_IMGRTE * WrkTmppr2
-     C                   EVAL      WrkJvs04 = WrkTmpacm
-     C                   EVAL      WrkAcrRate = WrkAcrRate + WrkTmpacm
+            WrkTmpacm   = STG_CMPRTE * WrkTmppr2;
+            WrkJvs02    = WrkTmpacm;
+            WrkAcrRate += WrkTmpacm;
 
-     C                   EVAL      WrkTmpacm = STG_OTHRTE * WrkTmppr2
-     C                   EVAL      WrkJvs05 = WrkTmpacm
-     C                   EVAL      WrkAcrRate = WrkAcrRate + WrkTmpacm
+            WrkTmpacm   = STG_ARRRTE * WrkTmppr2;
+            WrkJvs03    = WrkTmpacm;
+            WrkAcrRate += WrkTmpacm;
 
-     C                   EVAL      WrkJvRate = 0
-     C                   IF        STG_JVPC <> 0
-     C                   EVAL      WrkJv00 = STG_PRICE * 0.50
-     C                   EVAL      Wrk$Admf = 100.0 - Ctl_AdmFee
-     C                   EVAL      Wrk$Admfd = Wrk$Admf / 100
-     C                   EVAL      WrkJv01 = (WrkJv00 * Wrk$Admfd) - WrkJvs02 -
-     C                             WrkJvs03 - WrkJvs04 - WrkJvs05
-     C                   IF        STG_ROREF <> 726
-     C                   EVAL      WrkJv01 = WrkJv01 - WrkJvs01 - STG_MECFEE
-     C                   ENDIF
-     C                   EVAL      WrkJv00 = STG_JVPC * 0.01
-     C                   EVAL      WrkTmpacm = WrkJv00 * WrkJv01
-     C                   IF        WrkTmppr2 <> 0
-     C                   EVAL(H)   WrkJvRate = WrkTmpacm / WrkTmppr2
-     C                   ENDIF
-     C                   EVAL      WrkAcrRate = WrkAcrRate + WrkTmpacm
-     C                   ENDIF
+            WrkTmpacm   = STG_IMGRTE * WrkTmppr2;
+            WrkJvs04    = WrkTmpacm;
+            WrkAcrRate += WrkTmpacm;
 
-      * Agency is 50%
-     C                   IF        STG_AGCRTE <> 0
-     C                   EVAL(H)   WrkTmpacm = STG_AGCRTE * WrkTmppr2 * 0.50
-     C                   EVAL      WrkAcrRate = WrkAcrRate + WrkTmpacm
-     C                   ENDIF
+            WrkTmpacm   = STG_OTHRTE * WrkTmppr2;
+            WrkJvs05    = WrkTmpacm;
+            WrkAcrRate += WrkTmpacm;
 
-     C                   EVAL      WrkAcrRate = WrkAcrRate + STG_MECFEE +
-     C                             STG_OTHFEE
+            WrkJvRate = 0;
+            If STG_JVPC <> 0;
+               WrkJv00   = STG_PRICE * 0.50;
+               Wrk$Admf  = 100.0 - Ctl_AdmFee;
+               Wrk$Admfd = Wrk$Admf / 100;
+               WrkJv01   = (WrkJv00 * Wrk$Admfd)
+                         - WrkJvs02 - WrkJvs03 - WrkJvs04 - WrkJvs05;
+               If STG_ROREF <> 726;
+                  WrkJv01 = WrkJv01 - WrkJvs01 - STG_MECFEE;
+               Endif;
+               WrkJv00   = STG_JVPC * 0.01;
+               WrkTmpacm = WrkJv00 * WrkJv01;
+               If WrkTmppr2 <> 0;
+                  Eval(H) WrkJvRate = WrkTmpacm / WrkTmppr2;
+               Endif;
+               WrkAcrRate += WrkTmpacm;
+            Endif;
 
-     C                   ENDSR
+            // Agency is 50%
+            If STG_AGCRTE <> 0;
+               Eval(H) WrkTmpacm = STG_AGCRTE * WrkTmppr2 * 0.50;
+               WrkAcrRate += WrkTmpacm;
+            Endif;
+
+            WrkAcrRate += STG_MECFEE + STG_OTHFEE;
+
+         Endsr;
+      /end-free
