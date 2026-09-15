@@ -1,0 +1,23 @@
+     A**************************************************************
+     A* OEPEDTSWP                                                  *
+     A* OE: Edit Batches Enrolled in the Auto-Release Sweep        *
+     A*--------------------------------------------------------------
+     A* One row per edit batch description (channel) that should  *
+     A* be swept unattended through credit release, order history,*
+     A* and shipping documents by AIRRELSWP (called from           *
+     A* AICCRTORD in place of AIRRELCTL).                           *
+     A*                                                              *
+     A* Add or drop a channel by adding/removing a row (or setting *
+     A* ACTIVE to 'N') here -- no recompile of AIRRELSWP needed.    *
+     A*--------------------------------------------------------------
+     A* Project   Date     Int Description
+     A* -------   -------- --- -------------------------------------
+     A* TBD                    Initial version - control-file-driven
+     A*                        AIRRELCTL replacement
+     A**************************************************************
+     A          R OE$EDTSWP
+     A            DESC          20A         COLHDG('DESC')
+     A                                      TEXT('Edit batch description')
+     A            ACTIVE         1A         COLHDG('ACTIVE')
+     A                                      TEXT('Y=swept N=excluded')
+     A          K DESC
