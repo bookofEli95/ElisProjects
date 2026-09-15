@@ -515,7 +515,7 @@
             If STG_PURCH = 'Y';
                Cod_Itmnum  = WrkNewItm;
                Cod_ItmCode = 'PUR';
-               Write IVSITMCODE;
+               Write IV$ITMCODE;
             Endif;
 
             // 14. Conditional: Score Item & Slot (W#JOBSCR & IVPITEMS)
@@ -525,7 +525,7 @@
                Scr_Jobnum7 = WrkNewJob;
                Scr_Scrnum  = WrkScoreItm;
                Scr_Scrqty  = STG_SCQTY;
-               Write WSJOBSCR;
+               Write W$JOBSCR;
 
                Clear IVPITEM$;
                Itm_Itmnum     = WrkScoreItm;
