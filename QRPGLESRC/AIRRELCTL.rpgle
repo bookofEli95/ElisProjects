@@ -199,7 +199,7 @@
            Exec Sql
              select PickPut into :WrkPickPut
                from PLPEBDESC
-                 where Desc = :Bch@Ds.Desc20
+                 where Desc20 = :Bch@Ds.Desc20
                  fetch first row only;
 
            If Sqlcode = 0;
