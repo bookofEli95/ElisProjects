@@ -115,7 +115,7 @@
      D PrmScore        S              1A
      D PrmKit          S              1A
      D PrmBill         S              1A
-     D PrmDivCat       S              7A
+     D WrkPrmDivCat    S              7A
      D PrmBillItm      S              8A
 
      D WrkDivCat       S              7S 0 Inz(0)
@@ -178,7 +178,7 @@
             PrmScore   = STG_SCSLT;
             PrmKit     = STG_KIT;
             PrmBill    = 'N';
-            PrmDivCat  = %Editc(WrkDivCat : 'X');
+            WrkPrmDivCat = %Editc(WrkDivCat : 'X');
             PrmBillItm = *Blanks;
             Callp IVRGETITMN( PrmNextItm
                             : PrmScorItm
@@ -186,7 +186,7 @@
                             : PrmScore
                             : PrmKit
                             : PrmBill
-                            : PrmDivCat
+                            : WrkPrmDivCat
                             : PrmBillItm );
             WrkNewItm = %Int(PrmNextItm);
 
