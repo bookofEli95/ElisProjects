@@ -27,6 +27,9 @@
      FROLOWCTL1 IF   E           K DISK    EXTFILE('OBJECT/ROLOWCTL1')
      F                                     EXTDESC('OBJECT/ROLOWCTL1')
      F                                     PREFIX(CTL_)
+     FMFAUTHOR  IF   E           K DISK    EXTFILE('OBJECT/MFAUTHOR')
+     F                                     EXTDESC('OBJECT/MFAUTHOR')
+     F                                     PREFIX(Aut_)
 
       // Update / Add Files
      FPCPMAIN   UF A E           K DISK    EXTFILE('OBJECT/PCPMAIN')
@@ -89,6 +92,7 @@
       /copy qcopysrc,ivrorrgetc
       /copy qcopysrc,p1r999s
       /copy qcopysrc,pcrrern
+      /copy qcopysrc,uplow
 
       //***********************************************************************
       // Data Structures & Variables
@@ -126,6 +130,15 @@
      D WrkPos          S              3S 0 Inz(0)
      D WrkDate         S               D
      D WrkMktCoord     S             10A    Inz(*Blanks)
+
+     D WrkAuthor       S             12A    Inz(*Blanks)
+     D WrkAuthNorm     S             80A    Inz(*Blanks)
+     D WrkAuthSurname  S             40A    Inz(*Blanks)
+     D WrkAuthFirst    S             40A    Inz(*Blanks)
+     D WrkAuthCand     S             12A    Inz(*Blanks)
+     D WrkAuthPos      S              5S 0 Inz(0)
+     D WrkAuthScanFrom S              5S 0 Inz(0)
+     D WrkAuthLastSp   S              5S 0 Inz(0)
 
      D WrkTmppr2       S              7S 4 Inz(0)
      D WrkTmpacm       S              9S 4 Inz(0)
@@ -174,6 +187,19 @@
                   Iter;
                Endif;
             Endif;
+
+            // 0c. Resolve Composer/Author against MFAUTHOR. The CSV
+            //     supplies free text like "Mealor, Paul", but MFAUTHOR
+            //     is keyed on an uppercase "SURNAME [FIRSTNAME|INITIAL]"
+            //     convention with no comma (e.g. MEALOR PAUL,
+            //     FRANCES-HOAD, PROKOFIEV G). Try surname+firstname,
+            //     then surname+initial, then surname alone, using
+            //     whichever form actually exists in MFAUTHOR. Leaves
+            //     WrkAuthor blank if nothing matches, rather than write
+            //     a value that will fail the "invalid" check on the
+            //     maintenance screen - a curator picks the right entry
+            //     later via the F4 prompt (P1RPMTAUTH/P1VPMTAUTH).
+            Exsr Sbr_Match_Author;
 
             // 1. Extract Numeric Divcat from Staging Column
             WrkPos = %Scan(' ' : STG_CAT);
@@ -247,7 +273,7 @@
             Pblshrnum   = STG_PUBLSHR;
             Artist      = STG_ARTIST;
             Arrngr      = STG_ARRNGR;
-            Author      = STG_AUTHOR;
+            Author      = WrkAuthor;
             PublCode    = STG_PUBLCOD;
             PubCode     = STG_PUBCODE;
             Catlog      = STG_CATLOG;
@@ -418,7 +444,7 @@
             Itm_Ldesc      = STG_TITLE;
             Itm_Arrngr     = STG_ARRNGR;
             Itm_Artist     = STG_ARTIST;
-            Itm_Author     = STG_AUTHOR;
+            Itm_Author     = WrkAuthor;
             Itm_Catlog     = STG_CATLOG;
             Itm_Medium     = STG_MEDIUM;
             Itm_PblshrNum  = STG_PUBLSHR;
@@ -561,7 +587,7 @@
                Itm_Sdesc      = %TrimR(STG_SDESC) + ' SC';
                Itm_Arrngr     = STG_ARRNGR;
                Itm_Artist     = STG_ARTIST;
-               Itm_Author     = STG_AUTHOR;
+               Itm_Author     = WrkAuthor;
                Itm_Catlog     = STG_CATLOG;
                Itm_Medium     = STG_MEDIUM;
                Itm_PblshrNum  = STG_PUBLSHR;
@@ -693,6 +719,82 @@
             Endif;
 
             WrkAcrRate += STG_MECFEE + STG_OTHFEE;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Resolve Composer/Author against MFAUTHOR
+      //***********************************************************************
+      /free
+         Begsr Sbr_Match_Author;
+
+            WrkAuthor = *Blanks;
+
+            If %Trim(STG_AUTHOR) = *Blanks;
+               Leavesr;
+            Endif;
+
+            WrkAuthNorm = %Xlate(WrkLow:WrkUp:%Trim(STG_AUTHOR));
+
+            // Split into surname / first-name portions. A comma means
+            // "SURNAME, FIRSTNAME"; otherwise assume "FIRSTNAME ...
+            // SURNAME" and take the last space-delimited word.
+            WrkAuthPos = %Scan(',' : WrkAuthNorm);
+            If WrkAuthPos > 0;
+               WrkAuthSurname = %Trim(%Subst(WrkAuthNorm : 1 : WrkAuthPos - 1));
+               WrkAuthFirst   = %Trim(%Subst(WrkAuthNorm : WrkAuthPos + 1));
+            Else;
+               WrkAuthLastSp  = 0;
+               WrkAuthScanFrom = 1;
+               Dow WrkAuthScanFrom <= %Len(%TrimR(WrkAuthNorm));
+                  WrkAuthPos = %Scan(' ' : WrkAuthNorm : WrkAuthScanFrom);
+                  If WrkAuthPos = 0;
+                     Leave;
+                  Endif;
+                  WrkAuthLastSp   = WrkAuthPos;
+                  WrkAuthScanFrom = WrkAuthPos + 1;
+               Enddo;
+               If WrkAuthLastSp > 0;
+                  WrkAuthSurname = %Trim(%Subst(WrkAuthNorm : WrkAuthLastSp + 1));
+                  WrkAuthFirst   = %Trim(%Subst(WrkAuthNorm : 1 : WrkAuthLastSp - 1));
+               Else;
+                  WrkAuthSurname = %Trim(WrkAuthNorm);
+                  WrkAuthFirst   = *Blanks;
+               Endif;
+            Endif;
+
+            If WrkAuthFirst <> *Blanks;
+               // Candidate 1: "SURNAME FIRSTNAME"
+               WrkAuthCand = %TrimR(WrkAuthSurname) + ' ' + %TrimR(WrkAuthFirst);
+               Chain WrkAuthCand MFAUTHOR;
+               If %Found(MFAUTHOR);
+                  WrkAuthor = WrkAuthCand;
+                  Leavesr;
+               Endif;
+
+               // Candidate 2: "SURNAME F" (first initial only)
+               WrkAuthCand = %TrimR(WrkAuthSurname) + ' ' +
+                             %Subst(WrkAuthFirst : 1 : 1);
+               Chain WrkAuthCand MFAUTHOR;
+               If %Found(MFAUTHOR);
+                  WrkAuthor = WrkAuthCand;
+                  Leavesr;
+               Endif;
+            Endif;
+
+            // Candidate 3: surname alone
+            WrkAuthCand = %TrimR(WrkAuthSurname);
+            Chain WrkAuthCand MFAUTHOR;
+            If %Found(MFAUTHOR);
+               WrkAuthor = WrkAuthCand;
+               Leavesr;
+            Endif;
+
+            // No candidate matched - WrkAuthor stays blank so a
+            // curator can pick the right entry later via the F4
+            // prompt (P1RPMTAUTH/P1VPMTAUTH) rather than have this
+            // program write an author that fails validation.
 
          Endsr;
       /end-free
