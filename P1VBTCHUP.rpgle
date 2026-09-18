@@ -105,8 +105,8 @@
      D  PrmDelete              9      9A
      D  PrmReruna             10     10A
      D  Prm$Ldesc             11     97A
-     D  PrmDivcat             98    104A
-     D  PrmRorefNum2         105    109A
+     D  PrmDivcat             98    104  0
+     D  PrmRorefNum2         105    109  0
 
      D PrmJobNum7      S              7A
      D PrmNextItm      S              8A
@@ -485,8 +485,8 @@
             PrmDelete     = ' ';
             PrmReruna     = ' ';
             Prm$Ldesc     = STG_TITLE;
-            PrmDivcat     = %Char(WrkDivCat);
-            PrmRorefNum2  = %Editc(STG_ROREF : 'X');
+            PrmDivcat     = WrkDivCat;
+            PrmRorefNum2  = STG_ROREF;
             Callp IVRASKWD(IVRASKWDDS);
 
             // 12. Write PCR Breakeven Master (PCPBKEVN)
@@ -591,8 +591,8 @@
                PrmDelete     = ' ';
                PrmReruna     = ' ';
                Prm$Ldesc     = Itm_Ldesc;
-               PrmDivcat     = %Char(WrkDivCat);
-               PrmRorefNum2  = %Editc(STG_ROREF : 'X');
+               PrmDivcat     = WrkDivCat;
+               PrmRorefNum2  = STG_ROREF;
                Callp IVRASKWD(IVRASKWDDS);
             Endif;
 
