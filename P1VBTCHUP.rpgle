@@ -27,11 +27,11 @@
      FROLOWCTL1 IF   E           K DISK    EXTFILE('OBJECT/ROLOWCTL1')
      F                                     EXTDESC('OBJECT/ROLOWCTL1')
      F                                     PREFIX(CTL_)
-     FMFAUTHOR  IF   E           K DISK    EXTFILE('OBJECT/MFAUTHOR')
-     F                                     EXTDESC('OBJECT/MFAUTHOR')
-     F                                     PREFIX(Aut_)
 
       // Update / Add Files
+     FMFAUTHOR  UF A E           K DISK    EXTFILE('OBJECT/MFAUTHOR')
+     F                                     EXTDESC('OBJECT/MFAUTHOR')
+     F                                     PREFIX(Aut_)
      FPCPMAIN   UF A E           K DISK    EXTFILE('OBJECT/PCPMAIN')
      F                                     EXTDESC('OBJECT/PCPMAIN')
      FPCPROYLT  UF A E           K DISK    EXTFILE('OBJECT/PCPROYLT')
@@ -139,6 +139,9 @@
      D WrkAuthPos      S              5S 0 Inz(0)
      D WrkAuthScanFrom S              5S 0 Inz(0)
      D WrkAuthLastSp   S              5S 0 Inz(0)
+     D WrkAuthInit     S             20A    Inz(*Blanks)
+     D WrkAuthWord     S             40A    Inz(*Blanks)
+     D WrkAuthAddVal   S             12A    Inz(*Blanks)
 
      D WrkTmppr2       S              7S 4 Inz(0)
      D WrkTmpacm       S              9S 4 Inz(0)
@@ -764,37 +767,74 @@
                Endif;
             Endif;
 
+            // Candidate 1: "SURNAME FIRSTNAME" (full given name, or
+            // surname alone if no given name was supplied). Remember
+            // this as the value to add to MFAUTHOR if every candidate
+            // below comes up empty.
             If WrkAuthFirst <> *Blanks;
-               // Candidate 1: "SURNAME FIRSTNAME"
                WrkAuthCand = %TrimR(WrkAuthSurname) + ' ' + %TrimR(WrkAuthFirst);
-               Chain WrkAuthCand MFAUTHOR;
-               If %Found(MFAUTHOR);
-                  WrkAuthor = WrkAuthCand;
-                  Leavesr;
-               Endif;
-
-               // Candidate 2: "SURNAME F" (first initial only)
-               WrkAuthCand = %TrimR(WrkAuthSurname) + ' ' +
-                             %Subst(WrkAuthFirst : 1 : 1);
-               Chain WrkAuthCand MFAUTHOR;
-               If %Found(MFAUTHOR);
-                  WrkAuthor = WrkAuthCand;
-                  Leavesr;
-               Endif;
+            Else;
+               WrkAuthCand = %TrimR(WrkAuthSurname);
             Endif;
-
-            // Candidate 3: surname alone
-            WrkAuthCand = %TrimR(WrkAuthSurname);
+            WrkAuthAddVal = WrkAuthCand;
             Chain WrkAuthCand MFAUTHOR;
             If %Found(MFAUTHOR);
                WrkAuthor = WrkAuthCand;
                Leavesr;
             Endif;
 
-            // No candidate matched - WrkAuthor stays blank so a
-            // curator can pick the right entry later via the F4
-            // prompt (P1RPMTAUTH/P1VPMTAUTH) rather than have this
-            // program write an author that fails validation.
+            If WrkAuthFirst <> *Blanks;
+               // Candidate 2: "SURNAME" + the initial of every given/
+               // middle name word (e.g. "Thomas Agerfeldt" -> "T A",
+               // "Gabriel" -> "G").
+               WrkAuthInit = *Blanks;
+               WrkAuthScanFrom = 1;
+               Dow WrkAuthScanFrom <= %Len(%TrimR(WrkAuthFirst));
+                  WrkAuthPos = %Scan(' ' : WrkAuthFirst : WrkAuthScanFrom);
+                  If WrkAuthPos = 0;
+                     WrkAuthWord = %Trim(%Subst(WrkAuthFirst : WrkAuthScanFrom));
+                     WrkAuthScanFrom = %Len(%TrimR(WrkAuthFirst)) + 1;
+                  Else;
+                     WrkAuthWord = %Trim(%Subst(WrkAuthFirst : WrkAuthScanFrom :
+                                          WrkAuthPos - WrkAuthScanFrom));
+                     WrkAuthScanFrom = WrkAuthPos + 1;
+                  Endif;
+                  If WrkAuthWord <> *Blanks;
+                     If WrkAuthInit = *Blanks;
+                        WrkAuthInit = %Subst(WrkAuthWord : 1 : 1);
+                     Else;
+                        WrkAuthInit = %TrimR(WrkAuthInit) + ' ' +
+                                      %Subst(WrkAuthWord : 1 : 1);
+                     Endif;
+                  Endif;
+               Enddo;
+
+               If WrkAuthInit <> *Blanks;
+                  WrkAuthCand = %TrimR(WrkAuthSurname) + ' ' + %TrimR(WrkAuthInit);
+                  Chain WrkAuthCand MFAUTHOR;
+                  If %Found(MFAUTHOR);
+                     WrkAuthor = WrkAuthCand;
+                     Leavesr;
+                  Endif;
+               Endif;
+
+               // Candidate 3: surname alone
+               WrkAuthCand = %TrimR(WrkAuthSurname);
+               Chain WrkAuthCand MFAUTHOR;
+               If %Found(MFAUTHOR);
+                  WrkAuthor = WrkAuthCand;
+                  Leavesr;
+               Endif;
+            Endif;
+
+            // Every candidate has been checked and none exist in
+            // MFAUTHOR yet - add it as a new entry (mirroring the
+            // interactive Add flow in P1RPMTAUTH/P1VPMTAUTH) using the
+            // fullest candidate tried, then use it.
+            Clear MFAUTHO$;
+            Aut_Author = WrkAuthAddVal;
+            Write MFAUTHO$;
+            WrkAuthor = WrkAuthAddVal;
 
          Endsr;
       /end-free
