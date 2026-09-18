@@ -297,7 +297,7 @@
             StartDD     = %Subdt(%Date() : *D);
             StartYYYY   = %Subdt(%Date() : *Y);
             StartDt     = %Date();
-            Orign       = SdsUser;
+            Orign       = 'CATHL';
             @Send       = 'N';
             BusAff      = 'N';
             @Wino       = ' ';
@@ -398,7 +398,7 @@
             Orr_Hold     = *Blanks;
             Orr_Jobnum7  = WrkNewJob;
             Orr_Jobdate  = %Date();
-            Orr_Jobuser  = SdsUser;
+            Orr_Jobuser  = 'CATHL';
             Write IV$ORRITM;
 
             Clear IV$ORRMNT;
@@ -406,7 +406,7 @@
             Orm_Action   = 'Job created';
             Orm_Desc     = 'Job# ' + %Trim(%Editc(WrkNewJob : 'X'));
             Orm_MaintTs  = %Timestamp();
-            Orm_MaintWho = SdsUser;
+            Orm_MaintWho = 'CATHL';
             Write IV$ORRMNT;
 
             // 10. Write Inventory Item Master (IVPITEMS)
