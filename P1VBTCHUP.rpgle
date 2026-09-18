@@ -140,6 +140,7 @@
      D Wrk$Admfd       S              5S 4 Inz(0)
      D WrkAcrRate      S              9S 4 Inz(0)
      D WrkJvRate       S              7S 4 Inz(0)
+     D WrkDupCount     S             10I 0 Inz(0)
 
       //***********************************************************************
       //* MAIN LINE
@@ -155,6 +156,23 @@
             If STG_SDESC = *Blanks;
                Read PCRSTAGE;
                Iter;
+            Endif;
+
+            // 0b. Skip rows already uploaded previously - matched on
+            //     PUBCODE, which is unique per title in PCPMAIN. This
+            //     stops the same CSV (or an accidental re-run) from
+            //     minting a second set of job/item numbers for titles
+            //     that already exist.
+            WrkDupCount = 0;
+            If STG_PUBCODE <> *Blanks;
+               Exec SQL
+                  SELECT COUNT(*) INTO :WrkDupCount
+                    FROM PCPMAIN
+                   WHERE PUBCODE = :STG_PUBCODE;
+               If WrkDupCount > 0;
+                  Read PCRSTAGE;
+                  Iter;
+               Endif;
             Endif;
 
             // 1. Extract Numeric Divcat from Staging Column
