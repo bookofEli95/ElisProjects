@@ -132,13 +132,17 @@
      D WrkMktCoord     S             10A    Inz(*Blanks)
 
      D WrkAuthor       S             12A    Inz(*Blanks)
+     D WrkAuthOrig     S             80A    Inz(*Blanks)
      D WrkAuthNorm     S             80A    Inz(*Blanks)
      D WrkAuthSurname  S             40A    Inz(*Blanks)
      D WrkAuthFirst    S             40A    Inz(*Blanks)
      D WrkAuthCand     S             12A    Inz(*Blanks)
      D WrkAuthPos      S              5S 0 Inz(0)
      D WrkAuthScanFrom S              5S 0 Inz(0)
-     D WrkAuthLastSp   S              5S 0 Inz(0)
+     D WrkAuthWordsOrg S             40A    Dim(10) Inz(*Blanks)
+     D WrkAuthWordCnt  S              5S 0 Inz(0)
+     D WrkAuthSurnStart S             5S 0 Inz(0)
+     D WrkAuthIdx      S              5S 0 Inz(0)
      D WrkAuthInit     S             20A    Inz(*Blanks)
      D WrkAuthWord     S             40A    Inz(*Blanks)
      D WrkAuthAddVal   S             12A    Inz(*Blanks)
@@ -738,32 +742,75 @@
                Leavesr;
             Endif;
 
-            WrkAuthNorm = %Xlate(WrkLow:WrkUp:%Trim(STG_AUTHOR));
+            WrkAuthOrig = %Trim(STG_AUTHOR);
+            WrkAuthNorm = %Xlate(WrkLow:WrkUp:WrkAuthOrig);
 
             // Split into surname / first-name portions. A comma means
-            // "SURNAME, FIRSTNAME"; otherwise assume "FIRSTNAME ...
-            // SURNAME" and take the last space-delimited word.
+            // "SURNAME, FIRSTNAME" - unambiguous, use as-is. Otherwise
+            // it's "GIVEN [particles] SURNAME" order: tokenize into
+            // words (keeping original case) and walk backward from
+            // the last word, folding in any immediately preceding
+            // word(s) written entirely in lowercase - the standard
+            // convention for surname particles like "van", "der",
+            // "von", "de" - so e.g. "Leopold van der Pals" resolves
+            // to surname "VAN DER PALS", not just "PALS".
             WrkAuthPos = %Scan(',' : WrkAuthNorm);
             If WrkAuthPos > 0;
                WrkAuthSurname = %Trim(%Subst(WrkAuthNorm : 1 : WrkAuthPos - 1));
                WrkAuthFirst   = %Trim(%Subst(WrkAuthNorm : WrkAuthPos + 1));
             Else;
-               WrkAuthLastSp  = 0;
+               WrkAuthWordCnt = 0;
                WrkAuthScanFrom = 1;
-               Dow WrkAuthScanFrom <= %Len(%TrimR(WrkAuthNorm));
-                  WrkAuthPos = %Scan(' ' : WrkAuthNorm : WrkAuthScanFrom);
+               Dow WrkAuthScanFrom <= %Len(WrkAuthOrig) And WrkAuthWordCnt < 10;
+                  WrkAuthPos = %Scan(' ' : WrkAuthOrig : WrkAuthScanFrom);
                   If WrkAuthPos = 0;
+                     WrkAuthWordCnt += 1;
+                     WrkAuthWordsOrg(WrkAuthWordCnt) = %Subst(WrkAuthOrig : WrkAuthScanFrom);
                      Leave;
+                  Else;
+                     If WrkAuthPos > WrkAuthScanFrom;
+                        WrkAuthWordCnt += 1;
+                        WrkAuthWordsOrg(WrkAuthWordCnt) =
+                           %Subst(WrkAuthOrig : WrkAuthScanFrom : WrkAuthPos - WrkAuthScanFrom);
+                     Endif;
+                     WrkAuthScanFrom = WrkAuthPos + 1;
                   Endif;
-                  WrkAuthLastSp   = WrkAuthPos;
-                  WrkAuthScanFrom = WrkAuthPos + 1;
                Enddo;
-               If WrkAuthLastSp > 0;
-                  WrkAuthSurname = %Trim(%Subst(WrkAuthNorm : WrkAuthLastSp + 1));
-                  WrkAuthFirst   = %Trim(%Subst(WrkAuthNorm : 1 : WrkAuthLastSp - 1));
-               Else;
-                  WrkAuthSurname = %Trim(WrkAuthNorm);
+
+               If WrkAuthWordCnt <= 1;
+                  WrkAuthSurname = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(1)));
                   WrkAuthFirst   = *Blanks;
+               Else;
+                  WrkAuthSurnStart = WrkAuthWordCnt;
+                  Dow WrkAuthSurnStart > 1;
+                     WrkAuthWord = %TrimR(WrkAuthWordsOrg(WrkAuthSurnStart - 1));
+                     If WrkAuthWord <> *Blanks And
+                        %Xlate(WrkUp:WrkLow:WrkAuthWord) = WrkAuthWord;
+                        WrkAuthSurnStart -= 1;
+                     Else;
+                        Leave;
+                     Endif;
+                  Enddo;
+
+                  WrkAuthSurname = *Blanks;
+                  For WrkAuthIdx = WrkAuthSurnStart To WrkAuthWordCnt;
+                     If WrkAuthSurname = *Blanks;
+                        WrkAuthSurname = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                     Else;
+                        WrkAuthSurname = %TrimR(WrkAuthSurname) + ' ' +
+                                         %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                     Endif;
+                  Endfor;
+
+                  WrkAuthFirst = *Blanks;
+                  For WrkAuthIdx = 1 To WrkAuthSurnStart - 1;
+                     If WrkAuthFirst = *Blanks;
+                        WrkAuthFirst = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                     Else;
+                        WrkAuthFirst = %TrimR(WrkAuthFirst) + ' ' +
+                                       %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                     Endif;
+                  Endfor;
                Endif;
             Endif;
 
