@@ -500,7 +500,7 @@
             Mnt_MaintYYYY = %Subdt(%Date() : *Y);
             Mnt_Maintmm   = %Subdt(%Date() : *M);
             Mnt_Maintdd   = %Subdt(%Date() : *D);
-            Mnt_Maintwho  = SdsUser;
+            Mnt_Maintwho  = 'CATHL';
             Mnt_Before    = '***** ITEM ADDED ************';
             Mnt_After     = '***** ITEM ADDED ************';
             Mnt_Repcode   = 'N';
@@ -606,7 +606,7 @@
                Mnt_MaintYYYY = %Subdt(%Date() : *Y);
                Mnt_Maintmm   = %Subdt(%Date() : *M);
                Mnt_Maintdd   = %Subdt(%Date() : *D);
-               Mnt_Maintwho  = SdsUser;
+               Mnt_Maintwho  = 'CATHL';
                Mnt_Before    = '***** ITEM ADDED ************';
                Mnt_After     = '***** ITEM ADDED ************';
                Mnt_Repcode   = 'N';
