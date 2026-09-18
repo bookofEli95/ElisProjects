@@ -93,7 +93,7 @@
       //***********************************************************************
       // Data Structures & Variables
       //***********************************************************************
-     D PCDINQRY      E DS                  ExtName(PCDINQUIRY)
+     D PCDINQRY      E DS                  ExtName(OBJECT/PCDINQUIRY)
      D                                     DtaAra('OBJECT/PCDINQRY')
      D                                     Prefix(Pcd_)
 
