@@ -149,6 +149,14 @@
          Read PCRSTAGE;
          Dow Not %Eof(PCRSTAGE);
 
+            // 0. Skip blank/incomplete rows (e.g. trailing blank lines
+            //    left over from a CSV import) before any job/item number
+            //    gets generated for them.
+            If STG_SDESC = *Blanks;
+               Read PCRSTAGE;
+               Iter;
+            Endif;
+
             // 1. Extract Numeric Divcat from Staging Column
             WrkPos = %Scan(' ' : STG_CAT);
             If WrkPos > 0;
