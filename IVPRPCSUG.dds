@@ -1,0 +1,90 @@
+     A**********************************************************
+     A* IVPRPCSUG
+     A* Re-run Repricing Suggestions - one row per item per cycle
+     A**********************************************************
+     A* Written by IVRRPCGEN, actioned by an editor through
+     A* IVRRPCWRK, applied by IVRRPCAPL.
+     A*
+     A* RPCSTAT life cycle:
+     A*   S = suggested, waiting on the editor
+     A*   A = approved at the suggested price
+     A*   O = overridden, editor price in RPCAPP72/RPCAPP112
+     A*   G = override held, outside the catalogue guardrails
+     A*   R = rejected - by an editor, or stale/not applicable
+     A*   X = applied to IVPITEMS
+     A*   E = expired unactioned, CNO released
+     A*
+     A* An override past the catalogue guardrail is held at 'G' unless the
+     A* editor accepted the breach, which is what RPCOVRAUT is: the
+     A* guardrail stays advisory, but going past it has to be deliberate
+     A* and is recorded against the editor who did it.
+     A*
+     A* The RPCMODEL/RPCSCEN/RPCCATG/RPCRULSEQ and RPCLSTCHG fields
+     A* record which rule produced the number and what it was
+     A* computed from, so any suggestion can be reproduced after the
+     A* rule table has moved on.
+     A**********************************************************
+     A                                      UNIQUE
+     A          R IV$RPCSUG                 TEXT('Repricing suggestion')
+     A            ITMNUM         8S 0       TEXT('Item number')
+     A                                      COLHDG('ITEM' 'NUMBER')
+     A            RPCCYCL        6S 0       TEXT('Repricing cycle YYYYMM')
+     A                                      COLHDG('CY' 'CLE')
+     A            DIVCAT         7S 0       TEXT('Division/catalogue')
+     A                                      COLHDG('DIV' 'CAT')
+     A            RPCCATG        5A         TEXT('Catalogue group')
+     A                                      COLHDG('CAT' 'GROUP')
+     A            RPCSTAT        1A         TEXT('Status S/A/O/G/R/X/E')
+     A                                      COLHDG('STA' 'TUS')
+     A            RPCPHASE       1A         TEXT('Phase when suggested')
+     A                                      COLHDG('RPC' 'PHASE')
+     A            RPCMODEL       1A         TEXT('Model used B or P')
+     A                                      COLHDG('MO' 'DEL')
+     A            RPCSCEN        1A         TEXT('Scenario used S or A')
+     A                                      COLHDG('SCEN' 'ARIO')
+     A            RPCRULSEQ      3S 0       TEXT('Rule seq that matched')
+     A                                      COLHDG('RULE' 'SEQ')
+     A            RPCCUR72       9S 2       TEXT('Price72 when suggested')
+     A                                      COLHDG('CUR' 'PRICE72')
+     A            RPCCUR112      9S 2       TEXT('Price112 when suggested')
+     A                                      COLHDG('CUR' 'PRICE112')
+     A            RPCSUG72       9S 2       TEXT('Suggested Price72')
+     A                                      COLHDG('SUGG' 'PRICE72')
+     A            RPCSUG112      9S 2       TEXT('Suggested Price112')
+     A                                      COLHDG('SUGG' 'PRICE112')
+     A            RPCAPP72       9S 2       TEXT('Override/applied Pr72')
+     A                                      COLHDG('APPL' 'PRICE72')
+     A            RPCAPP112      9S 2       TEXT('Override/applied Pr112')
+     A                                      COLHDG('APPL' 'PRICE112')
+     A            RPCOVRAUT      1A         TEXT('Override past cap Y/N')
+     A                                      COLHDG('OVR' 'AUTH')
+     A            RPCUPLAMT      9S 2       TEXT('Dollar rise suggested')
+     A                                      COLHDG('UPLIFT' 'AMOUNT')
+     A            RPCUPLPCT      5S 2       TEXT('Effective rise pct')
+     A                                      COLHDG('UPLIFT' 'PCT')
+     A            RPCROUND       4A         TEXT('Rounding rule applied')
+     A                                      COLHDG('ROUND' 'RULE')
+     A            RPCCAPFL       1A         TEXT('Rise hit a cap Y/N')
+     A                                      COLHDG('CAP' 'FLAG')
+     A            RPCFLRFL       1A         TEXT('Budget floor lifted Y/N')
+     A                                      COLHDG('FLOOR' 'FLAG')
+     A            RPCDISP       10A         TEXT('Dead-title disposition')
+     A                                      COLHDG('DISPO' 'SITION')
+     A            RPCLSTCHG       L         TEXT('Last price change used')
+     A                                      COLHDG('LAST' 'PRICE' 'CHANGE')
+     A            RPCDUEDT        L         TEXT('Re-run due date')
+     A                                      COLHDG('RERUN' 'DUE')
+     A            RPCJOB7        7S 0       TEXT('Re-run job if known')
+     A                                      COLHDG('JOB' 'NUMBER')
+     A            RPCCNOFL       1A         TEXT('CNO attached Y/N')
+     A                                      COLHDG('CNO' 'FLAG')
+     A            RPCGENTS        Z         TEXT('Generated timestamp')
+     A                                      COLHDG('GEN' 'TS')
+     A            RPCACTTS        Z         TEXT('Actioned timestamp')
+     A                                      COLHDG('ACTION' 'TS')
+     A            RPCEDITR      10A         TEXT('Editor who actioned it')
+     A                                      COLHDG('EDIT' 'OR')
+     A            RPCNOTE       60A         TEXT('Override/hold reason')
+     A                                      COLHDG('NOTE')
+     A          K ITMNUM
+     A          K RPCCYCL

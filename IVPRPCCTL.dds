@@ -1,0 +1,65 @@
+     A**********************************************************
+     A* IVPRPCCTL
+     A* Re-run Repricing Control - one row per AS400 catalogue
+     A**********************************************************
+     A* One row per DIVCAT. DIVCAT 0 is the default row: it holds
+     A* the selection settings used before a catalogue is known
+     A* (re-run status list, horizon, audit field names) and the
+     A* fallback for any catalogue without a row of its own.
+     A*
+     A* RPCCATG maps this AS400 catalogue onto the catalogue group
+     A* the pricing documents are written in terms of (POP, CLA,
+     A* SFT, INS, CHO, EDU). The rule rows in IVPRPCRUL are keyed
+     A* by that group, not by DIVCAT, so several catalogues can
+     A* share one set of brackets.
+     A*
+     A* RPCPHASE is the rollout phase for this catalogue:
+     A*   0 = out of scope, no suggestion generated
+     A*   1 = AS400 suggests, editor approves or overrides
+     A*   2 = AS400 applies the suggestion automatically
+     A*
+     A* RPCMODEL picks which pricing model the suggestion uses:
+     A*   B = Manual Price Change Brackets (flat dollar uplift)
+     A*   P = Evaluating Bulk Reissue (percentage uplift)
+     A* RPCSCEN picks the column within the P model:
+     A*   S = Suggested        A = Aggressive
+     A**********************************************************
+     A                                      UNIQUE
+     A          R IV$RPCCTL                 TEXT('Repricing control')
+     A            DIVCAT         7S 0       TEXT('Div/catalogue 0=default')
+     A                                      COLHDG('DIV' 'CAT')
+     A            RPCCATG        5A         TEXT('Catalogue group for rules')
+     A                                      COLHDG('CAT' 'GROUP')
+     A            RPCPHASE       1A         TEXT('Rollout phase 0/1/2')
+     A                                      COLHDG('RPC' 'PHASE')
+     A            RPCMODEL       1A         TEXT('Pricing model B or P')
+     A                                      COLHDG('MO' 'DEL')
+     A            RPCSCEN        1A         TEXT('Scenario S or A')
+     A                                      COLHDG('SCEN' 'ARIO')
+     A            RPCELGMO       3S 0       TEXT('Min mths since price chg')
+     A                                      COLHDG('ELIGIBLE' 'MONTHS')
+     A            RPCHORIZ       3S 0       TEXT('Re-run horizon in months')
+     A                                      COLHDG('HORIZ' 'MONTHS')
+     A            RPCEXPCY       3S 0       TEXT('Cycles until expiry')
+     A                                      COLHDG('EXPIRE' 'CYCLES')
+     A            RPCCNOYN       1A         TEXT('Attach CNO Y/N')
+     A                                      COLHDG('CNO' 'Y/N')
+     A            RPCCNOCOD      3A         TEXT('Item code used as the CNO')
+     A                                      COLHDG('CNO' 'CODE')
+     A            RPCAUTCOD      3A         TEXT('Pricing-authority item cd')
+     A                                      COLHDG('AUTH' 'CODE')
+     A            RPCAUTACT      1A         TEXT('Auth action S=skip H=hold')
+     A                                      COLHDG('AUTH' 'ACTION')
+     A            RPCSTSLST     20A         TEXT('Eligible rerun statuses')
+     A                                      COLHDG('RERUN' 'STATUS' 'LIST')
+     A            RPCFLDLST     60A         TEXT('IVPMAINT price fld names')
+     A                                      COLHDG('PRICE' 'FIELD' 'LIST')
+     A            RPCNOCHDT       L         TEXT('Date used if never chgd')
+     A                                      COLHDG('NO' 'CHANGE' 'DATE')
+     A            RPCP112YN      1A         TEXT('Reprice PRICE112 too Y/N')
+     A                                      COLHDG('P112' 'Y/N')
+     A            RPCMNTTS        Z         TEXT('Last maintained timestamp')
+     A                                      COLHDG('MAINT' 'TS')
+     A            RPCMNTWHO     10A         TEXT('Last maintained by')
+     A                                      COLHDG('MAINT' 'WHO')
+     A          K DIVCAT

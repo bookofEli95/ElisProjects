@@ -1,0 +1,12 @@
+     A**********************************************************
+     A* IVPRPCSG1
+     A* Repricing suggestions by status within catalogue
+     A**********************************************************
+     A* The editor queue read by IVRRPCWRK: a catalogue owner works
+     A* their own outstanding suggestions, oldest cycle first.
+     A**********************************************************
+     A          R IV$RPCSUG                 PFILE(IVPRPCSUG)
+     A          K DIVCAT
+     A          K RPCSTAT
+     A          K RPCCYCL
+     A          K ITMNUM

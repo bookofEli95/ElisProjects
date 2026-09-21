@@ -1,0 +1,80 @@
+     A**********************************************************
+     A* IVPRPCRUL
+     A* Re-run Repricing Rules - the pricing logic as data
+     A**********************************************************
+     A* One row per catalogue group / model / scenario / price band
+     A* / last-price-change window. IVRRPCGEN loads the table into
+     A* memory and takes the first row (by RULSEQ) whose price band
+     A* and last-change window both match the item, so the pricing
+     A* logic is maintained as data and never as code.
+     A*
+     A* Both published models fit this one shape:
+     A*
+     A*   Manual Price Change Brackets (RULMODEL B) uses RULUPLAMT
+     A*   only - a flat dollar uplift per band per window.
+     A*
+     A*   Evaluating Bulk Reissue (RULMODEL P) uses RULUPLPCT with
+     A*   RULMINAMT (its "min $1.50"), RULCAPPCT (its increase cap),
+     A*   RULCAPAMT (its "cap $10"), RULFLOOR (its budget floor) and
+     A*   RULROUND 99 (its "snapped to nearest .99"). Its two rates
+     A*   per cell are two rows split on 01/01/2022: the stale rate
+     A*   for items last repriced before then, the other after.
+     A*
+     A* Order of operations in IVRRPCGEN:
+     A*   1. raw   = price + RULUPLAMT, or price * (1 + RULUPLPCT)
+     A*   2. floor the rise at RULMINAMT
+     A*   3. cap the rise at RULCAPPCT and at RULCAPAMT
+     A*   4. round per RULROUND (99 = nearest .99, LADR = ladder)
+     A*   5. re-assert RULFLOOR - the budget floor overrides the cap
+     A*
+     A* RULEXCLMN excludes cheap items from the band entirely (the
+     A* Instrumental "titles under $5 excluded" accessories rule).
+     A* RULDISP carries the disposition for dead titles through to
+     A* the suggestion for reporting.
+     A**********************************************************
+     A                                      UNIQUE
+     A          R IV$RPCRUL                 TEXT('Repricing rule')
+     A            RULCATG        5A         TEXT('Catalogue group')
+     A                                      COLHDG('CAT' 'GROUP')
+     A            RULMODEL       1A         TEXT('Model B=bracket P=percent')
+     A                                      COLHDG('MO' 'DEL')
+     A            RULSCEN        1A         TEXT('Scenario S or A')
+     A                                      COLHDG('SCEN' 'ARIO')
+     A            RULSEQ         3S 0       TEXT('Match order within model')
+     A                                      COLHDG('SEQ')
+     A            RULPRCFR       9S 2       TEXT('Price band from incl')
+     A                                      COLHDG('BAND' 'FROM')
+     A            RULPRCTO       9S 2       TEXT('Price band to incl')
+     A                                      COLHDG('BAND' 'TO')
+     A            RULCHGFR        L         TEXT('Last chg window from')
+     A                                      COLHDG('CHANGED' 'FROM')
+     A            RULCHGTO        L         TEXT('Last chg window to')
+     A                                      COLHDG('CHANGED' 'TO')
+     A            RULUPLAMT      9S 2       TEXT('Flat dollar uplift')
+     A                                      COLHDG('UPLIFT' 'AMOUNT')
+     A            RULUPLPCT      5S 2       TEXT('Percentage uplift')
+     A                                      COLHDG('UPLIFT' 'PCT')
+     A            RULMINAMT      9S 2       TEXT('Minimum dollar rise')
+     A                                      COLHDG('MIN' 'RISE')
+     A            RULCAPPCT      5S 2       TEXT('Cap on the rise pct')
+     A                                      COLHDG('CAP' 'PCT')
+     A            RULCAPAMT      9S 2       TEXT('Cap on the rise amount')
+     A                                      COLHDG('CAP' 'AMOUNT')
+     A            RULFLOOR       9S 2       TEXT('Budget floor price')
+     A                                      COLHDG('BUDGET' 'FLOOR')
+     A            RULEXCLMN      9S 2       TEXT('Exclude items under this')
+     A                                      COLHDG('EXCL' 'UNDER')
+     A            RULROUND       4A         TEXT('Round NONE/99/LADR')
+     A                                      COLHDG('ROUND' 'RULE')
+     A            RULDISP       10A         TEXT('Dead-title disposition')
+     A                                      COLHDG('DISPO' 'SITION')
+     A            RULTEXT       30A         TEXT('Rule label for reporting')
+     A                                      COLHDG('RULE' 'TEXT')
+     A            RULMNTTS        Z         TEXT('Last maintained timestamp')
+     A                                      COLHDG('MAINT' 'TS')
+     A            RULMNTWHO     10A         TEXT('Last maintained by')
+     A                                      COLHDG('MAINT' 'WHO')
+     A          K RULCATG
+     A          K RULMODEL
+     A          K RULSCEN
+     A          K RULSEQ

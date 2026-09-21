@@ -1,0 +1,81 @@
+     A* *********************************************************
+     A*  IVVRPCWRK
+     A*  Work with Repricing Suggestions - display file
+     A* *********************************************************
+     A*  The screen an editor approves or overrides a suggestion on,
+     A*  which is what phase 1 means: AS400 puts up a number and a
+     A*  person decides.
+     A*
+     A*  One line per suggestion, showing what the price is now, what
+     A*  is suggested, when the title is due to re-run and when it was
+     A*  last repriced - the four things needed to judge the number
+     A*  without leaving the screen.
+     A*
+     A*  Options:  2  override, using the price typed in the New column
+     A*            4  reject, leaving the price alone
+     A*            6  approve the suggested price
+     A*
+     A*  An override past the catalogue cap is not refused. It is held on
+     A*  the file at status 'G' and reported, and typing 2 again on the
+     A*  held line authorises it - so the confirmation survives a
+     A*  refresh, a sign-off and a shift change, and is recorded against
+     A*  the editor who gave it.
+     A*
+     A*  SCYCL is hidden rather than shown: each line has to carry its own
+     A*  key, and the cycle is of no interest to the person reading it.
+     A* *********************************************************
+     A                                      DSPSIZ(24 80 *DS3)
+     A                                      PRINT
+     A                                      CA03(03 'Exit')
+     A                                      CF05(05 'Refresh')
+     A                                      CA12(12 'Cancel')
+     A*
+     A*  Subfile record - one repricing suggestion
+     A          R RPCSFL1                   SFL
+     A            SOPT           2A  B  7  2VALUES(' ' '2' '4' '6')
+     A            SITEM          8S 0O  7  5
+     A            SCYCL          6S 0H
+     A            SDESC         18A  O  7 14
+     A            SSTAT          1A  O  7 33
+     A            SCUR           7S 2O  7 35
+     A            SSUG           7S 2O  7 44
+     A            SNEW           7S 2B  7 53
+     A            SDUE            L  O  7 62DATFMT(*MDY)
+     A                                      DATSEP('/')
+     A            SLSTC           L  O  7 71DATFMT(*MDY)
+     A                                      DATSEP('/')
+     A*
+     A*  Subfile control
+     A          R RPCCTL1                   SFLCTL(RPCSFL1)
+     A                                      SFLSIZ(9999)
+     A                                      SFLPAG(0012)
+     A*                                     Load-all subfile: SFLSIZ is
+     A*                                     larger than SFLPAG, so the
+     A*                                     system does the paging.
+     A                                      OVERLAY
+     A  21                                  SFLDSP
+     A  22                                  SFLDSPCTL
+     A  23                                  SFLCLR
+     A  24                                  SFLEND(*MORE)
+     A                                  1  2'IVRRPCWRK'
+     A                                  1 24'Work with Repricing Suggestions'
+     A            WDATE           L  O  1 68DATFMT(*MDY)
+     A                                      DATSEP('/')
+     A                                  3  2'Catalogue . . .'
+     A            WDIVCAT        7S 0B  3 18
+     A                                  3 28'0 = all'
+     A                                  3 40'Status . . .'
+     A            WSTAT          1A  B  3 53
+     A                                  3 56'blank = open'
+     A                                  5  2'Opt'
+     A                                  5  5'Item'
+     A                                  5 14'Description'
+     A                                  5 32'St'
+     A                                  5 35'Current'
+     A                                  5 45'Suggest'
+     A                                  5 55'New'
+     A                                  5 64'Due'
+     A                                  5 71'Repriced'
+     A            WMSG          78A  O 21  2DSPATR(HI)
+     A                                 22  2'2=Override   4=Reject   6=Approve'
+     A                                 23  2'F3=Exit   F5=Refresh   F12=Cancel'

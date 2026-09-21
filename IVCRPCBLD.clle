@@ -1,0 +1,73 @@
+/*====================================================================*/
+/* IVCRPCBLD                                                          */
+/* IV - Create the Re-run Repricing Objects                           */
+/*====================================================================*/
+/* Creates everything this release adds, in dependency order: the      */
+/* physical files first, then the logical over the suggestion file,    */
+/* then the display file, then the programs that reference them.       */
+/*                                                                    */
+/* Assumes the usual source members:                                   */
+/*   DDS   ->  OBJECT/QDDSSRC                                          */
+/*   RPG   ->  OBJECT/QRPGLESRC                                        */
+/*   CL    ->  OBJECT/QCLSRC                                           */
+/*                                                                    */
+/* The three seed scripts are run afterwards, not from here, because   */
+/* seeding is a data decision and this is an object build:             */
+/*                                                                    */
+/*   RUNSQLSTM SRCFILE(OBJECT/QSQLSRC) SRCMBR(IVPRPCCTLS)              */
+/*   RUNSQLSTM SRCFILE(OBJECT/QSQLSRC) SRCMBR(IVPRPCRULS)              */
+/*   RUNSQLSTM SRCFILE(OBJECT/QSQLSRC) SRCMBR(IVPRPCLADS)              */
+/*                                                                    */
+/* Every catalogue stays at phase 0 until a control row says otherwise,*/
+/* so building and seeding on their own change no prices.              */
+/*====================================================================*/
+             PGM
+
+             /* ---- files ------------------------------------------- */
+             CRTPF      FILE(OBJECT/IVPRPCCTL) SRCFILE(OBJECT/QDDSSRC) +
+                          SRCMBR(IVPRPCCTL) +
+                          TEXT('Re-run repricing control')
+             CRTPF      FILE(OBJECT/IVPRPCRUL) SRCFILE(OBJECT/QDDSSRC) +
+                          SRCMBR(IVPRPCRUL) +
+                          TEXT('Re-run repricing rules')
+             CRTPF      FILE(OBJECT/IVPRPCLAD) SRCFILE(OBJECT/QDDSSRC) +
+                          SRCMBR(IVPRPCLAD) +
+                          TEXT('Re-run repricing price ladder')
+             CRTPF      FILE(OBJECT/IVPRPCSUG) SRCFILE(OBJECT/QDDSSRC) +
+                          SRCMBR(IVPRPCSUG) +
+                          TEXT('Re-run repricing suggestions')
+             CRTLF      FILE(OBJECT/IVPRPCSG1) SRCFILE(OBJECT/QDDSSRC) +
+                          SRCMBR(IVPRPCSG1) +
+                          TEXT('Repricing suggestions by catalogue')
+
+             /* ---- display file ----------------------------------- */
+             CRTDSPF    FILE(OBJECT/IVVRPCWRK) SRCFILE(OBJECT/QDDSSRC) +
+                          SRCMBR(IVVRPCWRK) +
+                          TEXT('Work with repricing suggestions')
+
+             /* ---- programs --------------------------------------- */
+             /* All three use embedded SQL, so they go through the     */
+             /* SQL precompiler rather than CRTBNDRPG.                 */
+             CRTSQLRPGI OBJ(OBJECT/IVRRPCGEN) SRCFILE(OBJECT/QRPGLESRC) +
+                          SRCMBR(IVRRPCGEN) OBJTYPE(*PGM) +
+                          COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          TEXT('Generate repricing suggestions')
+             CRTSQLRPGI OBJ(OBJECT/IVRRPCAPL) SRCFILE(OBJECT/QRPGLESRC) +
+                          SRCMBR(IVRRPCAPL) OBJTYPE(*PGM) +
+                          COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          TEXT('Apply and expire repricing suggestions')
+             CRTSQLRPGI OBJ(OBJECT/IVRRPCWRK) SRCFILE(OBJECT/QRPGLESRC) +
+                          SRCMBR(IVRRPCWRK) OBJTYPE(*PGM) +
+                          COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          TEXT('Work with repricing suggestions')
+
+             /* ---- monthly driver -------------------------------- */
+             CRTBNDCL   PGM(OBJECT/IVCRPCMTH) SRCFILE(OBJECT/QCLSRC) +
+                          SRCMBR(IVCRPCMTH) +
+                          TEXT('Re-run repricing monthly run')
+
+             SNDPGMMSG  MSG('Repricing objects created. Seed the three +
+                          control files before opting any catalogue +
+                          in to phase 1.')
+
+             ENDPGM

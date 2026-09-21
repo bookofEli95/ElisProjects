@@ -1,0 +1,25 @@
+     A**********************************************************
+     A* IVPRPCLAD
+     A* Re-run Repricing Price Ladder
+     A**********************************************************
+     A* The rungs a laddered price may land on, in ascending order
+     A* within a catalogue group. Used when a matched rule carries
+     A* RULROUND LADR: the suggestion is the first rung at or above
+     A* the rule percentage, which is how the Choral octavo bands
+     A* are defined ("ladder step >= +6%") instead of a percentage
+     A* band. Seeded with the published Choral rungs 2.10 - 5.99.
+     A**********************************************************
+     A                                      UNIQUE
+     A          R IV$RPCLAD                 TEXT('Repricing price ladder')
+     A            LADCATG        5A         TEXT('Catalogue group')
+     A                                      COLHDG('CAT' 'GROUP')
+     A            LADSEQ         3S 0       TEXT('Rung order ascending')
+     A                                      COLHDG('SEQ')
+     A            LADPRICE       9S 2       TEXT('Rung price')
+     A                                      COLHDG('RUNG' 'PRICE')
+     A            LADMNTTS        Z         TEXT('Last maintained timestamp')
+     A                                      COLHDG('MAINT' 'TS')
+     A            LADMNTWHO     10A         TEXT('Last maintained by')
+     A                                      COLHDG('MAINT' 'WHO')
+     A          K LADCATG
+     A          K LADSEQ
