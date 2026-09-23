@@ -14,11 +14,13 @@
 /* SOURCE must be on the library list, so that the /copy members       */
 /* (QCOPYSRC: statusds, checksec, ivrudrlitm) resolve.                 */
 /*                                                                    */
-/* Objects are created in OBJECT, and the programs name their files    */
-/* EXTFILE('OBJECT/...') the way P1VBTCHUP does. Build and test on a   */
-/* development copy first: a phase 0 control row keeps the programs    */
-/* inert, but a build here replaces nothing only because none of these */
-/* objects exist yet.                                                  */
+/* Objects are created in OBJECT, like every other program, and the    */
+/* programs name their files EXTFILE('OBJECT/...') the way P1VBTCHUP   */
+/* does. Building straight into OBJECT is safe because every object    */
+/* here is new - confirm first that DSPOBJD OBJECT/IVPRPC*, IVRRPC*,   */
+/* IVVRPCWRK and IVCRPC* find nothing - and because the seeded control */
+/* row leaves every catalogue at phase 0, so nothing runs until one is */
+/* opted in.                                                           */
 /*                                                                    */
 /* The three seed scripts are run afterwards, not from here, because   */
 /* seeding is a data decision and this is an object build:             */
