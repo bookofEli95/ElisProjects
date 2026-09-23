@@ -67,6 +67,9 @@
      FIVPORRITM UF   E           K DISK    EXTFILE('OBJECT/IVPORRITM')
      F                                     EXTDESC('OBJECT/IVPORRITM')
      F                                     PREFIX(ORR_)
+     FNOTEPADI  UF   E           K DISK    EXTFILE('OBJECT/NOTEPADI')
+     F                                     EXTDESC('OBJECT/NOTEPADI')
+     F                                     PREFIX(NTE_)
 
       // Output Files
      FIVPMAINT  O    E           K DISK    EXTFILE('OBJECT/IVPMAINT')
@@ -116,6 +119,12 @@
      D WrkApplied      S              1A   Inz('N')
      D WrkAudAct       S             20A   Inz(*Blanks)
      D WrkStsTok       S             10A   Inz(*Blanks)
+      // The new price in the same type as IVPORRITM.NEWPRICE, so %Char of
+      // it is character for character what IVRORRNEWP scans a note for.
+      // Formatting it from a field of a different length or scale could
+      // produce 13.9900 where the report looks for 13.99, or the reverse,
+      // and the report would then print a change the note already covers.
+     D WrkCnoPrc       S                   Like(ORR_NEWPRICE) Inz(0)
      D WrkNote         S             60A   Inz(*Blanks)
      D WrkFld          S             10A   Inz(*Blanks)
      D WrkBefore       S             29A   Inz(*Blanks)
@@ -138,6 +147,7 @@
      D WrkCntNoQue     S             10I 0 Inz(0)
      D WrkCntQTaken    S             10I 0 Inz(0)
      D WrkCntNoRrn     S             10I 0 Inz(0)
+     D WrkCntCnoPrc    S             10I 0 Inz(0)
 
       //***********************************************************************
       //* Entry Parameters
@@ -430,7 +440,7 @@
             Endif;
 
             Exsr Sbr_Write_Audit;
-            Exsr Sbr_Release_CNO;
+            Exsr Sbr_Price_CNO;
 
             SUG_RPCSTAT   = 'X';
             SUG_RPCAPP72  = WrkNew72;
@@ -439,7 +449,6 @@
             Else;
                SUG_RPCAPP112 = SUG_RPCCUR112;
             Endif;
-            SUG_RPCCNOFL  = 'N';
             SUG_RPCACTTS  = %Timestamp();
             If SUG_RPCEDITR = *Blanks;
                SUG_RPCEDITR = WrkUser;
@@ -677,26 +686,90 @@
       /free
          Begsr Sbr_Release_CNO;
 
-            //-------------------------------------------------------------
-            // PROVISIONAL MECHANISM - matches Sbr_Attach_CNO in IVRRPCGEN
-            //-------------------------------------------------------------
-            // Deleted through SQL rather than by record key, so that no
-            // assumption is made about the key order of IVPITMCODE. When
-            // the real CNO process is confirmed, this subroutine and
-            // RPCCNOCOD are the only things that change.
-            //-------------------------------------------------------------
-            If CTL_RPCCNOCOD = *Blanks;
+            // The CNO is the NOTEPADI record IVRRPCGEN wrote, whose
+            // RCDNBR is kept on the suggestion. It is only deleted while it
+            // is still recognisably ours: if an editor has rewritten it
+            // and the "(IVRRPC" marker is gone, it has become their note
+            // and it stays.
+            If SUG_RPCCNORCD = 0;
+               SUG_RPCCNOFL = 'N';
                Leavesr;
             Endif;
 
-            Exec SQL
-               DELETE FROM IVPITMCODE
-                WHERE ITMNUM = :WrkSugItem
-                  AND ITMCODE = :CTL_RPCCNOCOD;
-
-            If SqlCod >= 0;
-               WrkDel += 1;
+            Chain (WrkSugItem : SUG_RPCCNORCD) NOTEPADI;
+            If %Found(NOTEPADI);
+               If %Scan('(IVRRPC' : NTE_NOTE1) > 0;
+                  Delete NOTEPAD$;
+                  WrkDel += 1;
+               Else;
+                  Unlock NOTEPADI;
+               Endif;
             Endif;
+
+            SUG_RPCCNOFL  = 'N';
+            SUG_RPCCNORCD = 0;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Turn the pending CNO into a price CNO
+      //***********************************************************************
+      /free
+         Begsr Sbr_Price_CNO;
+
+            // Once a price is decided, the "review pending" note is
+            // rewritten as the note an editor would write by hand: the
+            // word PRICE and the new price. That is the form IVRORRNEWP
+            // recognises as a change production already knows about
+            // (history: "Skip printing price change if correction note
+            // was added"), so the item is not reported twice. The note is
+            // left in place afterwards, like any other CNO - it is now
+            // the instruction for the reprint.
+            //
+            // No note of ours on the item - the CNO was switched off, or
+            // all four note records were taken - means nothing to
+            // rewrite. The staged NEWPRICE then puts the item on the
+            // Items with New Price report instead, which is the house
+            // fallback for a change with no CNO.
+            If SUG_RPCCNORCD = 0;
+               SUG_RPCCNOFL = 'N';
+               Leavesr;
+            Endif;
+
+            Chain (WrkSugItem : SUG_RPCCNORCD) NOTEPADI;
+            If Not %Found(NOTEPADI);
+               SUG_RPCCNOFL  = 'N';
+               SUG_RPCCNORCD = 0;
+               Leavesr;
+            Endif;
+            If %Scan('(IVRRPC' : NTE_NOTE1) = 0;
+               // An editor has made this note their own. Leave it.
+               Unlock NOTEPADI;
+               SUG_RPCCNOFL  = 'N';
+               SUG_RPCCNORCD = 0;
+               Leavesr;
+            Endif;
+
+            // The new price is the only number in the note. IVRORRNEWP
+            // matches %Char(NEWPRICE) anywhere in the text, so a second
+            // number - the old price, say - could later be matched by a
+            // different NEWPRICE and hide a real change from production.
+            //
+            // That scan has one weakness this cannot remove: it matches
+            // substrings, so if NEWPRICE is later changed by hand to 3.99
+            // the 13.99 in this note still "covers" it. The same is true
+            // of every hand-typed CNO. The fix belongs in IVRORRNEWP.
+            WrkCnoPrc   = WrkNew72;
+            NTE_NOTE1   = 'PRICE CHANGE ON RERUN (IVRRPCAPL) - ' +
+                          'NEW PRICE ' + %Trim(%Char(WrkCnoPrc));
+            NTE_NOTE2   = *Blanks;
+            NTE_CHGTS   = %Timestamp();
+            NTE_CHGUSER = WrkUser;
+            Update NOTEPAD$;
+
+            SUG_RPCCNOFL = 'Y';
+            WrkCntCnoPrc += 1;
 
          Endsr;
       /end-free
@@ -773,6 +846,7 @@
             Dsply ('Reject not rerun : ' + %Char(WrkCntNoRrn));
             Dsply ('Reject priced now: ' + %Char(WrkCntQTaken));
             Dsply ('CNOs released    : ' + %Char(WrkDel));
+            Dsply ('CNOs now priced  : ' + %Char(WrkCntCnoPrc));
 
          Endsr;
       /end-free

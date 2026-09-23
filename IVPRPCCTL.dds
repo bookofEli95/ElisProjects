@@ -44,8 +44,6 @@
      A                                      COLHDG('EXPIRE' 'CYCLES')
      A            RPCCNOYN       1A         TEXT('Attach CNO Y/N')
      A                                      COLHDG('CNO' 'Y/N')
-     A            RPCCNOCOD      3A         TEXT('Item code used as the CNO')
-     A                                      COLHDG('CNO' 'CODE')
      A            RPCAUTCOD      3A         TEXT('Pricing-authority item cd')
      A                                      COLHDG('AUTH' 'CODE')
      A            RPCAUTACT      1A         TEXT('Auth action S=skip H=hold')

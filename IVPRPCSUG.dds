@@ -19,6 +19,10 @@
      A* guardrail stays advisory, but going past it has to be deliberate
      A* and is recorded against the editor who did it.
      A*
+     A* RPCCNORCD is the NOTEPADI record this process wrote as the CNO,
+     A* so it only ever updates or deletes its own note and never one an
+     A* editor typed into the item's note pad.
+     A*
      A* The RPCMODEL/RPCSCEN/RPCCATG/RPCRULSEQ and RPCLSTCHG fields
      A* record which rule produced the number and what it was
      A* computed from, so any suggestion can be reproduced after the
@@ -78,6 +82,8 @@
      A                                      COLHDG('JOB' 'NUMBER')
      A            RPCCNOFL       1A         TEXT('CNO attached Y/N')
      A                                      COLHDG('CNO' 'FLAG')
+     A            RPCCNORCD      1S 0       TEXT('NOTEPADI RCDNBR of the CNO')
+     A                                      COLHDG('CNO' 'RCD')
      A            RPCGENTS        Z         TEXT('Generated timestamp')
      A                                      COLHDG('GEN' 'TS')
      A            RPCACTTS        Z         TEXT('Actioned timestamp')

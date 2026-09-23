@@ -41,17 +41,15 @@
 --              set, but it keeps the two out if the list is ever
 --              cleared.
 --
---   RPCCNOYN   'N' and RPCCNOCOD blank - the CNO is switched OFF.
---              The mechanism written so far adds an item code to
---              IVPITMCODE, and IVRORRNEWP shows that is not what a CNO
---              is: a correction note is a record on NOTEPADI (up to four
---              per item, keyed on item and RCDNBR, text in NOTE1 and
---              NOTE2), and a price CNO is recognised by its text holding
---              the word PRICE and the new price. Writing IVPITMCODE rows
---              would pollute a real file for nothing, so it stays off
---              until it is pointed at NOTEPADI - which needs that file's
---              field list, because the name of its item field and its
---              record format have not been visible in any program yet.
+--   RPCCNOYN   'Y' - attach a correction note (CNO) to every
+--              candidate. A CNO is a record on NOTEPADI, the item's
+--              pop-up note pad (up to four read per item, keyed on
+--              ITMNUM and RCDNBR). While the review is open the note
+--              says not to reprint at the current price; once a price
+--              is approved it is rewritten as "PRICE CHANGE ON RERUN -
+--              NEW PRICE n.nn", the form IVRORRNEWP recognises as a
+--              change production already knows about. Notes carry
+--              "(IVRRPC" so that editors' own notes are never touched.
 --
 --   RPCAPLTGT  'Q' - an approved price is staged on the re-run queue
 --              as IVPORRITM.NEWPRICE, not written to the item.
@@ -93,13 +91,13 @@
 INSERT INTO OBJECT/IVPRPCCTL
         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
          RPCELGMO, RPCHORIZ, RPCEXPCY,
-         RPCCNOYN, RPCCNOCOD, RPCAUTCOD, RPCAUTACT,
+         RPCCNOYN, RPCAUTCOD, RPCAUTACT,
          RPCSTSLST, RPCSTSEXC, RPCFLDLST, RPCNOCHDT, RPCP112YN,
          RPCAPLTGT, RPCMNTTS, RPCMNTWHO)
 VALUES
   (0, '     ', '0', 'B', 'S',
    18, 6, 3,
-   'N', '   ', '   ', 'H',
+   'Y', '   ', 'H',
    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
    DATE('1900-01-01'), 'Y',
    'Q', CURRENT TIMESTAMP, 'SEED');
@@ -112,13 +110,13 @@ VALUES
 -- INSERT INTO OBJECT/IVPRPCCTL
 --         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
 --          RPCELGMO, RPCHORIZ, RPCEXPCY,
---          RPCCNOYN, RPCCNOCOD, RPCAUTCOD, RPCAUTACT,
+--          RPCCNOYN, RPCAUTCOD, RPCAUTACT,
 --          RPCSTSLST, RPCSTSEXC, RPCFLDLST, RPCNOCHDT, RPCP112YN,
 --          RPCAPLTGT, RPCMNTTS, RPCMNTWHO)
 -- VALUES
 --   (9999999, 'CHO', '1', 'P', 'S',
 --    18, 6, 3,
---    'N', '   ', '   ', 'H',
+--    'Y', '   ', 'H',
 --    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
 --    DATE('1900-01-01'), 'Y',
 --    'Q', CURRENT TIMESTAMP, 'SEED');

@@ -55,11 +55,13 @@
      FIVPRPCSUG UF A E           K DISK    EXTFILE('OBJECT/IVPRPCSUG')
      F                                     EXTDESC('OBJECT/IVPRPCSUG')
      F                                     PREFIX(SUG_)
+      // The item note pad. A correction note (CNO) is a record here - see
+      // Sbr_Attach_CNO.
+     FNOTEPADI  UF A E           K DISK    EXTFILE('OBJECT/NOTEPADI')
+     F                                     EXTDESC('OBJECT/NOTEPADI')
+     F                                     PREFIX(NTE_)
 
       // Output Files
-     FIVPITMCODEO    E           K DISK    EXTFILE('OBJECT/IVPITMCODE')
-     F                                     EXTDESC('OBJECT/IVPITMCODE')
-     F                                     PREFIX(COD_)
      FIVPORRMNT O    E           K DISK    EXTFILE('OBJECT/IVPORRMNT')
      F                                     EXTDESC('OBJECT/IVPORRMNT')
      F                                     PREFIX(ORM_)
@@ -154,6 +156,9 @@
      D WrkPhase        S              1A   Inz(*Blanks)
      D WrkNote         S             60A   Inz(*Blanks)
      D WrkCnoFl        S              1A   Inz('N')
+     D WrkCnoRcd       S                   Like(NTE_RCDNBR) Inz(0)
+     D WrkCnoTxt       S                   Like(NTE_NOTE1)
+     D WrkRcd          S                   Like(NTE_RCDNBR) Inz(0)
      D WrkMode         S              1A   Inz('P')
      D WrkUser         S             10A   Inz(*Blanks)
 
@@ -174,6 +179,7 @@
      D WrkCntWrote     S             10I 0 Inz(0)
      D WrkCntCno       S             10I 0 Inz(0)
      D WrkCntQNew      S             10I 0 Inz(0)
+     D WrkCntCnoFull   S             10I 0 Inz(0)
      D WrkCntNoQue     S             10I 0 Inz(0)
      D WrkQueRow       S              1A   Inz('N')
 
@@ -478,6 +484,7 @@
             WrkFlrFl   = 'N';
             WrkAuthHld = 'N';
             WrkCnoFl   = 'N';
+            WrkCnoRcd  = 0;
             WrkNote    = *Blanks;
 
             // 1. Item master
@@ -650,7 +657,7 @@
 
             // The CNO goes on before the suggestion is written, so the
             // suggestion records truthfully whether the item is flagged.
-            If CTL_RPCCNOYN = 'Y' And CTL_RPCCNOCOD <> *Blanks;
+            If CTL_RPCCNOYN = 'Y';
                Exsr Sbr_Attach_CNO;
             Endif;
 
@@ -903,41 +910,84 @@
       /free
          Begsr Sbr_Attach_CNO;
 
-            //-------------------------------------------------------------
-            // WRONG TARGET - SWITCHED OFF BY THE SEED (RPCCNOYN 'N')
-            //-------------------------------------------------------------
-            // This writes an item code to IVPITMCODE. IVRORRNEWP shows
-            // that is not what a CNO is: a correction note is a record on
-            // NOTEPADI, up to four per item keyed on item and RCDNBR,
-            // with the text in NOTE1 and NOTE2. A price CNO is one whose
-            // text holds the word PRICE and the new price, which is how
-            // IVRORRNEWP decides a price change is already covered.
+            // A correction note (CNO) is a record on NOTEPADI, the item's
+            // pop-up note pad, keyed on item and RCDNBR. IVRORRNEWP reads
+            // records 1 to 4 of it and treats a note that contains the
+            // word PRICE and the new price as a price change production
+            // already knows about. That is the house mechanism, so it is
+            // the one used here.
             //
-            // Repointing this at NOTEPADI needs that file's field list:
-            // no program read so far names its item field or its record
-            // format, and guessing either would write bad notes to a file
-            // production reads. Until then the seed keeps this off.
+            // At this point the review is still open and there is no new
+            // price, so the note says so. Because it is the pop-up note
+            // pad, anyone who opens the item sees it - which is the alert
+            // the release asks for.
             //
-            // What it is for is unchanged: an item with a repricing
-            // review open must not be reprinted at the old price.
-            // IVRRPCAPL releases it again when the suggestion is applied,
-            // rejected or expired.
-            //-------------------------------------------------------------
-            WrkCount = 0;
-            Exec SQL
-               SELECT COUNT(*) INTO :WrkCount
-                 FROM IVPITMCODE
-                WHERE ITMNUM = :WrkCndItem
-                  AND ITMCODE = :CTL_RPCCNOCOD;
+            // The note carries "(IVRRPCGEN)" so that this process can
+            // always tell its own note from one an editor typed, and never
+            // touches theirs. If an editor rewrites it and the marker goes,
+            // the note becomes theirs.
+            WrkCnoFl  = 'N';
+            WrkCnoRcd = 0;
 
-            If WrkCount = 0;
-               Clear IV$ITMCODE;
-               COD_ITMNUM  = WrkCndItem;
-               COD_ITMCODE = CTL_RPCCNOCOD;
-               Write IV$ITMCODE;
-               WrkCntCno += 1;
+            // Reuse a note of ours already on the item, if a previous
+            // cycle left one, rather than pile up another.
+            For WrkRcd = 1 To 4;
+               Chain(N) (WrkCndItem : WrkRcd) NOTEPADI;
+               If %Found(NOTEPADI)
+                  And %Scan('(IVRRPC' : NTE_NOTE1) > 0;
+                  WrkCnoRcd = WrkRcd;
+                  Leave;
+               Endif;
+            Endfor;
+
+            // Otherwise the first free record of the four IVRORRNEWP reads.
+            If WrkCnoRcd = 0;
+               For WrkRcd = 1 To 4;
+                  Setll (WrkCndItem : WrkRcd) NOTEPADI;
+                  If Not %Equal(NOTEPADI);
+                     WrkCnoRcd = WrkRcd;
+                     Leave;
+                  Endif;
+               Endfor;
             Endif;
+
+            // All four in use by other notes. Nobody's note is overwritten
+            // to make room. The item still gets its suggestion, and once a
+            // price is staged IVRORRNEWP reports it to production anyway,
+            // because no note carries it.
+            If WrkCnoRcd = 0;
+               WrkCntCnoFull += 1;
+               Leavesr;
+            Endif;
+
+            // No price in this note, deliberately. IVRORRNEWP decides a
+            // change is covered by scanning a note for the word PRICE and
+            // the text of NEWPRICE anywhere in it, so any number here could
+            // later match a different NEWPRICE: a current price of 13.99
+            // in the note would hide a NEWPRICE of 3.99 from production.
+            WrkCnoTxt = 'REPRICE REVIEW PENDING (IVRRPCGEN) - DO NOT ' +
+                        'REPRINT AT THE CURRENT PRICE UNTIL THE NEW ' +
+                        'PRICE IS SET.';
+
+            Chain (WrkCndItem : WrkCnoRcd) NOTEPADI;
+            If %Found(NOTEPADI);
+               NTE_NOTE1   = WrkCnoTxt;
+               NTE_NOTE2   = *Blanks;
+               NTE_CHGTS   = %Timestamp();
+               NTE_CHGUSER = WrkUser;
+               Update NOTEPAD$;
+            Else;
+               Clear NOTEPAD$;
+               NTE_ITMNUM  = WrkCndItem;
+               NTE_RCDNBR  = WrkCnoRcd;
+               NTE_NOTE1   = WrkCnoTxt;
+               NTE_ADDTS   = %Timestamp();
+               NTE_ADDUSER = WrkUser;
+               Write NOTEPAD$;
+            Endif;
+
             WrkCnoFl = 'Y';
+            WrkCntCno += 1;
 
             Exsr Sbr_Write_Audit;
 
@@ -982,6 +1032,7 @@
             SUG_RPCDUEDT  = WrkDueDt;
             SUG_RPCJOB7   = WrkCndJob;
             SUG_RPCCNOFL  = WrkCnoFl;
+            SUG_RPCCNORCD = WrkCnoRcd;
             SUG_RPCGENTS  = %Timestamp();
             SUG_RPCACTTS  = *Loval;
             SUG_RPCEDITR  = *Blanks;
@@ -1030,6 +1081,7 @@
             Dsply ('Candidates read : ' + %Char(WrkCntRead));
             Dsply ('Suggestions     : ' + %Char(WrkCntWrote));
             Dsply ('CNOs attached   : ' + %Char(WrkCntCno));
+            Dsply ('CNO pad full    : ' + %Char(WrkCntCnoFull));
             Dsply ('Skip no item    : ' + %Char(WrkCntNoItem));
             Dsply ('Skip no control : ' + %Char(WrkCntNoCtl));
             Dsply ('Skip phase 0    : ' + %Char(WrkCntPhase));

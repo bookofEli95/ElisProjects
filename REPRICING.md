@@ -195,19 +195,47 @@ Two consequences, both handled:
   at the new printing — and until then the generator leaves the title alone,
   because its queue row now carries a `NEWPRICE`. The loop closes by itself.
 
-**The CNO is `NOTEPADI`, not an item code.** `IVRORRNEWP` reads up to four
-note records per item, keyed on item and `RCDNBR`, and decides a price change
-is already covered when a note's `NOTE1` or `NOTE2` contains the word `PRICE`
-and the new price. Its history reads *"Skip printing price change if correction
-note was added"*. So the `IVPITMCODE` mechanism written earlier was pointed at
-the wrong file. It is **switched off** in the seed (`RPCCNOYN 'N'`, blank
-`RPCCNOCOD`) rather than left writing rows to a real file for nothing.
+**The CNO is `NOTEPADI`, not an item code — and it is now wired up.**
+`IVRORRNEWP` reads up to four note records per item and decides a price change
+is already covered when a note contains the word `PRICE` and the new price. Its
+history reads *"Skip printing price change if correction note was added"*.
+`NOTEPADI` is the item's pop-up note pad (record format `NOTEPAD$`: `ITMNUM`,
+`RCDNBR`, `NOTE1` 256, `NOTE2` 186, add/change timestamp and user).
 
-Pointing it at `NOTEPADI` needs that file's field list — no program so far names
-its item field or its record format, and a guess would write malformed notes to
-a file production reads. Worth knowing when it is wired up: a note must format
-the price exactly as `%Char(ORR_NEWPRICE)` does, or `IVRORRNEWP`'s `%Scan` will
-not find it and will report the change twice.
+The CNO now follows the review through:
+
+| Stage | Note on the item |
+| --- | --- |
+| Suggestion raised | `REPRICE REVIEW PENDING (IVRRPCGEN) - DO NOT REPRINT AT THE CURRENT PRICE UNTIL THE NEW PRICE IS SET.` |
+| Approved and staged | rewritten to `PRICE CHANGE ON RERUN (IVRRPCAPL) - NEW PRICE 13.99` |
+| Rejected, expired, stale, no longer rerun | deleted |
+
+Because it is the pop-up note pad, anyone who opens the item sees the pending
+note — which is the alert the release asks for. Once approved it becomes the
+note an editor would have typed by hand, in exactly the form `IVRORRNEWP`
+recognises, so the change is not reported twice. After that it stays, like any
+other CNO: it is the instruction for the reprint.
+
+Guarantees that matter here:
+
+- **Editors' notes are never touched.** The process uses the first free record
+  of the four `IVRORRNEWP` reads, stores its `RCDNBR` on the suggestion, and only
+  updates or deletes a note that still carries `(IVRRPC`. If an editor rewrites
+  it and the marker goes, it is theirs. If all four records are taken, no note
+  is added — the item still gets its suggestion, and the staged `NEWPRICE` puts
+  it on the *Items with New Price* report instead.
+- **The price is formatted exactly as `IVRORRNEWP` formats it**, from a field
+  declared `LIKE(ORR_NEWPRICE)`, so the scan finds `13.99` and not `13.9900`.
+- **The notes carry no number except the new price.** `IVRORRNEWP` matches
+  `%Char(NEWPRICE)` anywhere in the text, so an old price in the note — `13.99`
+  — would later "cover" a hand-set `NEWPRICE` of `3.99` and hide it from
+  production. Proven against its matching rule before committing.
+
+One weakness remains that this cannot fix, because it is in `IVRORRNEWP` itself:
+its scan matches substrings, so if `NEWPRICE` is later changed by hand from
+`13.99` to `3.99`, the note still "covers" it. That is equally true of every
+hand-typed CNO today. The fix is a one-line change in `IVRORRNEWP` — scan for
+the price with a delimiter in front of it — and is outside this change.
 
 **`RERUNSTS` now has meanings, from the programs that test each value.**
 
@@ -265,17 +293,10 @@ forgotten suggestion would quietly block production. After `RPCEXPCY` cycles the
 suggestion expires and the CNO comes off, which also lets the next run raise the
 title again rather than forget it.
 
-**The attachment mechanism is currently switched off.** It was written against
-`IVPITMCODE`, and `IVRORRNEWP` has since shown the real mechanism is a note
-record on `NOTEPADI` — see *What the online re-run programs settled*. All CNO
-changes are isolated to `Sbr_Attach_CNO` in `IVRRPCGEN` and `Sbr_Release_CNO` in
-`IVRRPCAPL`, so repointing them is two subroutines once `NOTEPADI`'s field list
-is known.
-
-In the meantime the alerting half of the job is partly done already: once an
-approved price is staged as `NEWPRICE`, the existing *Items with New Price*
-report puts it in front of production. What is missing without the CNO is the
-alert **during** review, before a price is approved.
+The mechanism is `NOTEPADI` — see *What the online re-run programs settled* for
+the note text at each stage and the guarantees around editors' notes. It lives in
+two subroutines, `Sbr_Attach_CNO` in `IVRRPCGEN` and `Sbr_Release_CNO` /
+`Sbr_Price_CNO` in `IVRRPCAPL`, and is switched by `RPCCNOYN`.
 
 ## Running it
 
@@ -297,9 +318,6 @@ printing happens. Nothing read so far does it. If nothing does — if an editor
 retypes it into `IVRMAINT2` — then staging hands them a number instead of a
 calculation, which is still the phase 1 goal; but it should be known, not
 assumed.
-
-The next most useful thing is **`DSPFFD NOTEPADI`**, which is all that stands
-between the CNO and a working implementation.
 
 These are gaps in what could be confirmed, not loose ends in the build. Each one
 is control data rather than a hard-coded guess, so closing it is a data change.
