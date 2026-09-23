@@ -47,6 +47,9 @@
      FIVPITEMS  IF   E           K DISK    EXTFILE('OBJECT/IVPITEMS')
      F                                     EXTDESC('OBJECT/IVPITEMS')
      F                                     PREFIX(ITM_)
+     FIVPORRITM IF   E           K DISK    EXTFILE('OBJECT/IVPORRITM')
+     F                                     EXTDESC('OBJECT/IVPORRITM')
+     F                                     PREFIX(ORR_)
 
       // Update / Add Files
      FIVPRPCSUG UF A E           K DISK    EXTFILE('OBJECT/IVPRPCSUG')
@@ -170,6 +173,9 @@
      D WrkCntAuth      S             10I 0 Inz(0)
      D WrkCntWrote     S             10I 0 Inz(0)
      D WrkCntCno       S             10I 0 Inz(0)
+     D WrkCntQNew      S             10I 0 Inz(0)
+     D WrkCntNoQue     S             10I 0 Inz(0)
+     D WrkQueRow       S              1A   Inz('N')
 
       //***********************************************************************
       //* Entry Parameters
@@ -200,11 +206,22 @@
          // taken from both places AS400 records one, with the earlier of
          // the two dates winning:
          //
-         //   IVPORRITM  the online re-run queue. MINQTYDT is the date
-         //              stock reaches its minimum, so a date already in
-         //              the past means the item is at or below its
-         //              reorder point - more due, not less. No lower
-         //              bound is applied on this side.
+         //   IVPORRITM  the online re-run queue. The date is ESTBODT,
+         //              the estimated back-order date the Min Qty
+         //              Online report prints (IVRORRIVP2) - a forecast of
+         //              when stock runs out, which is what the pricing
+         //              documents mean by due ("stock depletes ... within
+         //              6 months"). MINQTYDT, the date stock reached its
+         //              minimum, is only the fallback: it is almost
+         //              always already past for anything in the queue,
+         //              so on its own it cannot tell 1 month from 12.
+         //              A past date means more due, not less, so no
+         //              lower bound is applied on this side.
+         //
+         //              RERUNSTS is matched with a blank written as
+         //              *BLANK, because the Min Qty Online population -
+         //              the earliest point a title can be priced - is
+         //              exactly the rows with a blank status.
          //
          //   RERUN8     the planned production finish date. Completed
          //              jobs keep their old dates, so this side is
@@ -213,20 +230,30 @@
             DECLARE CsrCand CURSOR FOR
                SELECT CND.ITMNUM, MIN(CND.DUE8), MAX(CND.JOB7)
                  FROM ( SELECT O.ITMNUM AS ITMNUM,
-                               YEAR(O.MINQTYDT) * 10000
-                             + MONTH(O.MINQTYDT) * 100
-                             + DAY(O.MINQTYDT) AS DUE8,
+                               CASE WHEN O.ESTBODT IS NOT NULL
+                                     AND O.ESTBODT > DATE('0001-01-01')
+                                    THEN YEAR(O.ESTBODT) * 10000
+                                       + MONTH(O.ESTBODT) * 100
+                                       + DAY(O.ESTBODT)
+                                    ELSE YEAR(O.MINQTYDT) * 10000
+                                       + MONTH(O.MINQTYDT) * 100
+                                       + DAY(O.MINQTYDT)
+                               END AS DUE8,
                                O.JOBNUM7 AS JOB7
                           FROM IVPORRITM O
                          WHERE O."HOLD" = ' '
-                           AND O.RERUNSTS <> ' '
-                           AND O.MINQTYDT IS NOT NULL
                            AND ( :WrkStsChk = 'N'
-                              OR LOCATE(' ' CONCAT TRIM(O.RERUNSTS)
-                                            CONCAT ' ', :WrkStsPad) > 0 )
+                              OR LOCATE(' ' CONCAT
+                                   CASE WHEN O.RERUNSTS = ' '
+                                        THEN '*BLANK'
+                                        ELSE TRIM(O.RERUNSTS) END
+                                   CONCAT ' ', :WrkStsPad) > 0 )
                            AND ( :WrkExcChk = 'N'
-                              OR LOCATE(' ' CONCAT TRIM(O.RERUNSTS)
-                                            CONCAT ' ', :WrkExcPad) = 0 )
+                              OR LOCATE(' ' CONCAT
+                                   CASE WHEN O.RERUNSTS = ' '
+                                        THEN '*BLANK'
+                                        ELSE TRIM(O.RERUNSTS) END
+                                   CONCAT ' ', :WrkExcPad) = 0 )
                         UNION ALL
                         SELECT R.ITEM# AS ITMNUM,
                                R.FINISHYYYY * 10000
@@ -465,6 +492,23 @@
                Leavesr;
             Endif;
 
+            // 2b. Somebody has already priced this re-run by hand. A
+            //     NEWPRICE on the queue row that differs from PRICE72 is
+            //     a price change waiting for the new printing - it is
+            //     exactly what IVRORRNEWP reports to production - so a
+            //     suggestion now would ask an editor to redo a decision
+            //     already made, or worse, overwrite it on approval.
+            Chain (WrkCndItem) IVPORRITM;
+            WrkQueRow = 'N';
+            If %Found(IVPORRITM);
+               WrkQueRow = 'Y';
+            Endif;
+            If WrkQueRow = 'Y' And ORR_NEWPRICE <> 0
+               And ORR_NEWPRICE <> ITM_PRICE72;
+               WrkCntQNew += 1;
+               Leavesr;
+            Endif;
+
             // 3. This catalogue's control row, falling back to the
             //    default row so an unlisted catalogue is still governed
             //    rather than silently taking part.
@@ -475,6 +519,17 @@
                   WrkCntNoCtl += 1;
                   Leavesr;
                Endif;
+            Endif;
+
+            // 3b. When approved prices are staged on the re-run queue
+            //     (RPCAPLTGT 'Q'), a title with no queue row - one that
+            //     came from RERUN8 alone - has nowhere for its price to
+            //     wait, so a suggestion would be a dead end at approval.
+            //     RERUN8 still earns its place: for a title on both, its
+            //     date can be the earlier.
+            If CTL_RPCAPLTGT <> 'I' And WrkQueRow = 'N';
+               WrkCntNoQue += 1;
+               Leavesr;
             Endif;
 
             // 4. Phase 0, or anything unrecognised, is out of scope
@@ -849,20 +904,24 @@
          Begsr Sbr_Attach_CNO;
 
             //-------------------------------------------------------------
-            // PROVISIONAL MECHANISM
+            // WRONG TARGET - SWITCHED OFF BY THE SEED (RPCCNOYN 'N')
             //-------------------------------------------------------------
-            // The correction note is attached here as an item code on
-            // IVPITMCODE, which is the only per-item marker of this kind
-            // this source can see in use (P1VBTCHUP writes 'PUR' for
-            // purchased product). The code itself is control data, so
-            // when the real CNO process is confirmed only this
-            // subroutine and RPCCNOCOD change - the suggestion file and
-            // everything downstream stay as they are.
+            // This writes an item code to IVPITMCODE. IVRORRNEWP shows
+            // that is not what a CNO is: a correction note is a record on
+            // NOTEPADI, up to four per item keyed on item and RCDNBR,
+            // with the text in NOTE1 and NOTE2. A price CNO is one whose
+            // text holds the word PRICE and the new price, which is how
+            // IVRORRNEWP decides a price change is already covered.
             //
-            // What it is for is not provisional: an item with a
-            // repricing review open must not be reprinted at the old
-            // price. IVRRPCAPL releases it again when the suggestion is
-            // applied, rejected or expired.
+            // Repointing this at NOTEPADI needs that file's field list:
+            // no program read so far names its item field or its record
+            // format, and guessing either would write bad notes to a file
+            // production reads. Until then the seed keeps this off.
+            //
+            // What it is for is unchanged: an item with a repricing
+            // review open must not be reprinted at the old price.
+            // IVRRPCAPL releases it again when the suggestion is applied,
+            // rejected or expired.
             //-------------------------------------------------------------
             WrkCount = 0;
             Exec SQL
@@ -983,6 +1042,8 @@
             Dsply ('Skip under min  : ' + %Char(WrkCntExcl));
             Dsply ('Skip no rise    : ' + %Char(WrkCntNoRise));
             Dsply ('Skip authority  : ' + %Char(WrkCntAuth));
+            Dsply ('Skip priced now : ' + %Char(WrkCntQNew));
+            Dsply ('Skip no queue   : ' + %Char(WrkCntNoQue));
 
          Endsr;
       /end-free

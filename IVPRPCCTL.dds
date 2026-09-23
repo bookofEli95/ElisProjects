@@ -60,6 +60,8 @@
      A                                      COLHDG('NO' 'CHANGE' 'DATE')
      A            RPCP112YN      1A         TEXT('Reprice PRICE112 too Y/N')
      A                                      COLHDG('P112' 'Y/N')
+     A            RPCAPLTGT      1A         TEXT('Apply to Q=queue I=item')
+     A                                      COLHDG('APPLY' 'TARGET')
      A            RPCMNTTS        Z         TEXT('Last maintained timestamp')
      A                                      COLHDG('MAINT' 'TS')
      A            RPCMNTWHO     10A         TEXT('Last maintained by')

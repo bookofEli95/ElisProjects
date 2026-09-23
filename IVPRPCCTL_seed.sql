@@ -13,20 +13,56 @@
 -- Two seeded values are placeholders that must be confirmed before any
 -- catalogue moves to phase 1 or 2:
 --
---   RPCSTSLST  Left blank, which means "do not filter on re-run
---              status". The eligible IVPORRITM.RERUNSTS codes are still
---              not established. Put the real codes here, space
---              delimited, e.g. ' A I Q '. Until then the candidate set
---              is wider than the internal approval queue the Redash
---              report filters to.
+--   RPCSTSLST  ' *BLANK A K B I P ' - every IVPORRITM.RERUNSTS value
+--              that existing programs treat as a live re-run:
+--                *BLANK     hit minimum qty, not yet actioned - the
+--                           population of the Min Qty Online report
+--                           (IVRORRIVP2 selects RERUNSTS = ' ')
+--                A K B I P  approved / active - the population of the
+--                           Items with New Price report (IVRORRNEWP)
+--              Blank is written *BLANK because a blank cannot be a
+--              token in a space-delimited list.
 --
---   RPCSTSEXC  Statuses to exclude, seeded ' J '. This is established:
---              IVRMAINT sets RERUNSTS to 'J' with a blank Hold to take
---              an item off the online re-run queue ("remove from Online
---              Rerun", history action 'canceled'), and P1VBTCHUP writes
---              'J' for a job it created outside the queue. So 'J' means
---              not in the queue and must stay out even while the
---              inclusion list above is blank.
+--              Individual meanings of A, K, B, I and P are not stated
+--              anywhere read so far - only that IVRORRNEWP treats them
+--              as one approved set. P has a wrinkle: IVRORRNEWP only
+--              counts it when ORR_DEPT = 'BO', a routing rule for which
+--              report it prints on. It is included here unconditionally;
+--              drop it from this list if P means the job is already too
+--              far along for a price change.
+--
+--   RPCSTSEXC  ' J N ' - statuses that mean the title is not going to
+--              be reprinted:
+--                J  taken off the queue. IVRMAINT sets it with a blank
+--                   Hold ("remove from Online Rerun", action 'canceled')
+--                   and P1VBTCHUP writes it for a job made outside it.
+--                N  not to be rerun. IVRORRNBR reports exactly these.
+--              Redundant with the inclusion list above while that is
+--              set, but it keeps the two out if the list is ever
+--              cleared.
+--
+--   RPCCNOYN   'N' and RPCCNOCOD blank - the CNO is switched OFF.
+--              The mechanism written so far adds an item code to
+--              IVPITMCODE, and IVRORRNEWP shows that is not what a CNO
+--              is: a correction note is a record on NOTEPADI (up to four
+--              per item, keyed on item and RCDNBR, text in NOTE1 and
+--              NOTE2), and a price CNO is recognised by its text holding
+--              the word PRICE and the new price. Writing IVPITMCODE rows
+--              would pollute a real file for nothing, so it stays off
+--              until it is pointed at NOTEPADI - which needs that file's
+--              field list, because the name of its item field and its
+--              record format have not been visible in any program yet.
+--
+--   RPCAPLTGT  'Q' - an approved price is staged on the re-run queue
+--              as IVPORRITM.NEWPRICE, not written to the item.
+--              IVRORRNEWP treats NEWPRICE as a price change waiting for
+--              the new printing: it compares it to PRICE72 and reports
+--              it to production unless a CNO already carries it. While
+--              the price is still printed on the book, raising PRICE72
+--              before the new printing exists would put the system price
+--              out of step with the cover on every copy in stock. 'I'
+--              writes IVPITEMS directly and is there for a phase in
+--              which that no longer matters.
 --
 --   RPCFLDLST  The IVPMAINT.FLDNAM values a price change is logged
 --              under. Three spellings are in use for the one event, and
@@ -59,13 +95,14 @@ INSERT INTO OBJECT/IVPRPCCTL
          RPCELGMO, RPCHORIZ, RPCEXPCY,
          RPCCNOYN, RPCCNOCOD, RPCAUTCOD, RPCAUTACT,
          RPCSTSLST, RPCSTSEXC, RPCFLDLST, RPCNOCHDT, RPCP112YN,
-         RPCMNTTS, RPCMNTWHO)
+         RPCAPLTGT, RPCMNTTS, RPCMNTWHO)
 VALUES
   (0, '     ', '0', 'B', 'S',
    18, 6, 3,
-   'Y', 'CNO', '   ', 'H',
-   ' ', ' J ', ' PRICE PRICE72 PRICE112 ', DATE('1900-01-01'), 'Y',
-   CURRENT TIMESTAMP, 'SEED');
+   'N', '   ', '   ', 'H',
+   ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
+   DATE('1900-01-01'), 'Y',
+   'Q', CURRENT TIMESTAMP, 'SEED');
 
 -- ------------------------------------------------------------------
 -- Example of opting one catalogue in to phase 1. DIVCAT is a
@@ -77,10 +114,11 @@ VALUES
 --          RPCELGMO, RPCHORIZ, RPCEXPCY,
 --          RPCCNOYN, RPCCNOCOD, RPCAUTCOD, RPCAUTACT,
 --          RPCSTSLST, RPCSTSEXC, RPCFLDLST, RPCNOCHDT, RPCP112YN,
---          RPCMNTTS, RPCMNTWHO)
+--          RPCAPLTGT, RPCMNTTS, RPCMNTWHO)
 -- VALUES
---   (9999999, 'CHO', '1', 'B', 'S',
+--   (9999999, 'CHO', '1', 'P', 'S',
 --    18, 6, 3,
---    'Y', 'CNO', '   ', 'H',
---    ' ', ' J ', ' PRICE PRICE72 PRICE112 ', DATE('1900-01-01'), 'Y',
---    CURRENT TIMESTAMP, 'SEED');
+--    'N', '   ', '   ', 'H',
+--    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
+--    DATE('1900-01-01'), 'Y',
+--    'Q', CURRENT TIMESTAMP, 'SEED');

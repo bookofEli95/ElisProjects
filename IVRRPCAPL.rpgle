@@ -7,10 +7,12 @@
       //**********************************************************************
       // Program Information
       // ------------------------------------------------------------------
-      // Applies actioned repricing suggestions to the item master and
-      // releases the CNO. This is the only program that changes a
-      // price, so every price movement from this process passes through
-      // one place and leaves one audit trail.
+      // Carries out actioned repricing suggestions and releases the CNO.
+      // By default an approved price is staged on the re-run queue as
+      // IVPORRITM.NEWPRICE, where production already looks for it, rather
+      // than written to the item - see Sbr_Apply. This is the only
+      // program in the process that writes a price anywhere, so every
+      // price movement passes through one place and leaves one trail.
       //
       // What it acts on:
       //
@@ -62,6 +64,9 @@
      FIVPITEMS  UF A E           K DISK    EXTFILE('OBJECT/IVPITEMS')
      F                                     EXTDESC('OBJECT/IVPITEMS')
      F                                     PREFIX(ITM_)
+     FIVPORRITM UF   E           K DISK    EXTFILE('OBJECT/IVPORRITM')
+     F                                     EXTDESC('OBJECT/IVPORRITM')
+     F                                     PREFIX(ORR_)
 
       // Output Files
      FIVPMAINT  O    E           K DISK    EXTFILE('OBJECT/IVPMAINT')
@@ -108,6 +113,9 @@
      D WrkBreach       S              1A   Inz('N')
      D WrkRulFnd       S              1A   Inz('N')
      D WrkOldStat      S              1A   Inz(*Blanks)
+     D WrkApplied      S              1A   Inz('N')
+     D WrkAudAct       S             20A   Inz(*Blanks)
+     D WrkStsTok       S             10A   Inz(*Blanks)
      D WrkNote         S             60A   Inz(*Blanks)
      D WrkFld          S             10A   Inz(*Blanks)
      D WrkBefore       S             29A   Inz(*Blanks)
@@ -126,6 +134,10 @@
      D WrkCntNoRise    S             10I 0 Inz(0)
      D WrkCntSkip      S             10I 0 Inz(0)
      D WrkCntRejCno    S             10I 0 Inz(0)
+     D WrkCntStaged    S             10I 0 Inz(0)
+     D WrkCntNoQue     S             10I 0 Inz(0)
+     D WrkCntQTaken    S             10I 0 Inz(0)
+     D WrkCntNoRrn     S             10I 0 Inz(0)
 
       //***********************************************************************
       //* Entry Parameters
@@ -285,8 +297,9 @@
                Leavesr;
             Endif;
 
-            // The item still has to exist.
-            Chain (WrkSugItem) IVPITEMS;
+            // The item still has to exist. Read without a lock: only the
+            // 'I' apply path writes the item, and it takes its own lock.
+            Chain(N) (WrkSugItem) IVPITEMS;
             If Not %Found(IVPITEMS);
                WrkNote = 'ITEM NOT ON IVPITEMS';
                Exsr Sbr_Reject;
@@ -325,10 +338,12 @@
 
             Exsr Sbr_Apply;
 
-            If WrkAction = 'U';
-               WrkCntAuto += 1;
-            Else;
-               WrkCntApplied += 1;
+            If WrkApplied = 'Y';
+               If WrkAction = 'U';
+                  WrkCntAuto += 1;
+               Else;
+                  WrkCntApplied += 1;
+               Endif;
             Endif;
 
          Endsr;
@@ -390,6 +405,149 @@
       /free
          Begsr Sbr_Apply;
 
+            // Where an approved price goes is control data (RPCAPLTGT):
+            //
+            //   Q  staged on the re-run queue as IVPORRITM.NEWPRICE. This
+            //      is the default, and the house process: IVRORRNEWP
+            //      treats NEWPRICE as a price change waiting for the new
+            //      printing and reports it to production. PRICE72 moves
+            //      when the new printing does, through whatever moves it
+            //      today - so the system price never runs ahead of the
+            //      price printed on the copies still in stock.
+            //
+            //   I  written straight to IVPITEMS. For a phase in which the
+            //      price is no longer printed on the book.
+            WrkApplied = 'N';
+
+            If CTL_RPCAPLTGT = 'I';
+               Exsr Sbr_Apply_Item;
+            Else;
+               Exsr Sbr_Stage_Queue;
+            Endif;
+
+            If WrkApplied = 'N';
+               Leavesr;
+            Endif;
+
+            Exsr Sbr_Write_Audit;
+            Exsr Sbr_Release_CNO;
+
+            SUG_RPCSTAT   = 'X';
+            SUG_RPCAPP72  = WrkNew72;
+            If CTL_RPCP112YN = 'Y';
+               SUG_RPCAPP112 = WrkNew72;
+            Else;
+               SUG_RPCAPP112 = SUG_RPCCUR112;
+            Endif;
+            SUG_RPCCNOFL  = 'N';
+            SUG_RPCACTTS  = %Timestamp();
+            If SUG_RPCEDITR = *Blanks;
+               SUG_RPCEDITR = WrkUser;
+            Endif;
+
+            Select;
+            When CTL_RPCAPLTGT <> 'I' And WrkAction = 'U';
+               SUG_RPCNOTE = 'STAGED AS RE-RUN NEW PRICE - PHASE 2';
+            When CTL_RPCAPLTGT <> 'I';
+               SUG_RPCNOTE = 'STAGED AS RE-RUN NEW PRICE';
+            When WrkAction = 'U';
+               SUG_RPCNOTE = 'APPLIED AUTOMATICALLY - PHASE 2';
+            Endsl;
+            Update IV$RPCSUG;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Stage the price on the re-run queue
+      //***********************************************************************
+      /free
+         Begsr Sbr_Stage_Queue;
+
+            WrkAudAct = 'Reprice staged';
+
+            // Read for update: this row is the one being written.
+            Chain (WrkSugItem) IVPORRITM;
+
+            // No queue row, so nowhere for a pending price to wait. The
+            // row can go between suggestion and approval - IVRORRCLN's
+            // satellites show items leave the queue routinely - so this
+            // is checked here even though IVRRPCGEN will not raise a
+            // suggestion for an item without one.
+            If Not %Found(IVPORRITM);
+               WrkNote = 'NO RE-RUN QUEUE ROW TO CARRY THE NEW PRICE';
+               Exsr Sbr_Reject;
+               WrkCntNoQue += 1;
+               Leavesr;
+            Endif;
+
+            // The title has since been marked not to be reprinted, or
+            // taken off the queue. A pending price on a book that is not
+            // going to press is noise for production.
+            //
+            // Matched as a whole token, spaces included, so that a status
+            // of 'A' or 'K' cannot match inside *BLANK.
+            If ORR_RERUNSTS = ' ';
+               WrkStsTok = '*BLANK';
+            Else;
+               WrkStsTok = %Trim(ORR_RERUNSTS);
+            Endif;
+            If %Trim(CTL_RPCSTSEXC) <> *Blanks
+               And %Scan(' ' + %Trim(WrkStsTok) + ' ' :
+                         ' ' + %Trim(CTL_RPCSTSEXC) + ' ') > 0;
+               Unlock IVPORRITM;
+               WrkNote = 'NO LONGER BEING RERUN - STATUS ' + ORR_RERUNSTS;
+               Exsr Sbr_Reject;
+               WrkCntNoRrn += 1;
+               Leavesr;
+            Endif;
+
+            // Somebody has put a different new price on the queue since
+            // the suggestion was made. A person's decision stands over
+            // this one, so it is not overwritten.
+            If ORR_NEWPRICE <> 0 And ORR_NEWPRICE <> SUG_RPCCUR72
+               And ORR_NEWPRICE <> WrkNew72;
+               Unlock IVPORRITM;
+               WrkNote = 'QUEUE ALREADY HAS A NEW PRICE OF ' +
+                         %Trim(%Char(ORR_NEWPRICE));
+               Exsr Sbr_Reject;
+               WrkCntQTaken += 1;
+               Leavesr;
+            Endif;
+
+            // Only NEWPRICE is written back, so nothing else on a row the
+            // production screens are using can be undone.
+            ORR_NEWPRICE = WrkNew72;
+            Update IV$ORRITM %Fields(ORR_NEWPRICE);
+
+            // No IVPMAINT row here, on purpose: the list price has not
+            // moved yet. A 'PRICE72' row now would tell IVRRPCGEN the
+            // title had just been repriced, and it would restart the
+            // eligibility clock on a price nobody has printed. The row
+            // gets written by whatever moves PRICE72 at the new printing.
+            WrkApplied = 'Y';
+            WrkCntStaged += 1;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Write the price straight to the item
+      //***********************************************************************
+      /free
+         Begsr Sbr_Apply_Item;
+
+            WrkAudAct = 'Reprice applied';
+
+            // Read for update this time. The earlier read took no lock.
+            Chain (WrkSugItem) IVPITEMS;
+            If Not %Found(IVPITEMS);
+               WrkNote = 'ITEM NOT ON IVPITEMS';
+               Exsr Sbr_Reject;
+               WrkCntNoItem += 1;
+               Leavesr;
+            Endif;
+
             WrkOld72  = ITM_PRICE72;
             WrkOld112 = ITM_PRICE112;
 
@@ -422,21 +580,7 @@
                Exsr Sbr_Write_Maint;
             Endif;
 
-            Exsr Sbr_Write_Audit;
-            Exsr Sbr_Release_CNO;
-
-            SUG_RPCSTAT   = 'X';
-            SUG_RPCAPP72  = WrkNew72;
-            SUG_RPCAPP112 = ITM_PRICE112;
-            SUG_RPCCNOFL  = 'N';
-            SUG_RPCACTTS  = %Timestamp();
-            If SUG_RPCEDITR = *Blanks;
-               SUG_RPCEDITR = WrkUser;
-            Endif;
-            If WrkAction = 'U';
-               SUG_RPCNOTE = 'APPLIED AUTOMATICALLY - PHASE 2';
-            Endif;
-            Update IV$RPCSUG;
+            WrkApplied = 'Y';
 
          Endsr;
       /end-free
@@ -596,8 +740,8 @@
 
             Clear IV$ORRMNT;
             ORM_ITMNUM   = WrkSugItem;
-            ORM_ACTION   = 'Reprice applied';
-            ORM_DESC     = %Trim(%Char(WrkOld72)) + ' to ' +
+            ORM_ACTION   = WrkAudAct;
+            ORM_DESC     = %Trim(%Char(SUG_RPCCUR72)) + ' to ' +
                            %Trim(%Char(WrkNew72));
             ORM_MAINTTS  = %Timestamp();
             ORM_MAINTWHO = WrkUser;
@@ -624,6 +768,10 @@
             Dsply ('No control row   : ' + %Char(WrkCntNoCtl));
             Dsply ('Left open        : ' + %Char(WrkCntSkip));
             Dsply ('Rejected, CNO off: ' + %Char(WrkCntRejCno));
+            Dsply ('Staged NEWPRICE  : ' + %Char(WrkCntStaged));
+            Dsply ('Reject no queue  : ' + %Char(WrkCntNoQue));
+            Dsply ('Reject not rerun : ' + %Char(WrkCntNoRrn));
+            Dsply ('Reject priced now: ' + %Char(WrkCntQTaken));
             Dsply ('CNOs released    : ' + %Char(WrkDel));
 
          Endsr;

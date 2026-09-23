@@ -34,7 +34,7 @@ a catalogue moves phase by having its `IVPRPCCTL.RPCPHASE` changed:
 | --- | --- | --- | --- |
 | `0` | none | none | full manual decision, as today |
 | `1` | generated, editor enters the price | attached automatically | approve / override |
-| `2` | generated and applied monthly | attached automatically | override (not recommended) |
+| `2` | generated and staged monthly | attached automatically | override (not recommended) |
 
 Everything is seeded at phase `0`. Building and seeding on their own change no
 prices; a catalogue takes part only when someone gives it a row.
@@ -163,6 +163,80 @@ Two smaller conventions adopted: `MNT_COMMENT` carries the program name
 `Update IVPITEM$ %Fields(ITM_PRICE72 : ITM_PRICE112)` rather than a full-record
 write, so it cannot undo another job's change to an unrelated field.
 
+## What the online re-run programs settled
+
+`IVRORRNEWP`, `IVRORRNBR`, `IVRORRIVP2` and `IVRORRCLN` changed the design in
+three places.
+
+**The re-run queue already has a pending-price field: `IVPORRITM.NEWPRICE`.**
+`IVRORRNEWP` — *Online Rerun System Items with New Price* — reports every
+approved item whose `NEWPRICE` differs from `PRICE72`, so production knows the
+new printing needs a new price. That is the existing home for "the price this
+book should have when it is reprinted", and until now it has been filled by
+hand. **Approved prices are now staged there by default** (`RPCAPLTGT 'Q'`)
+instead of written to `IVPITEMS`.
+
+The reason is the cover. While the price is still printed on the book, raising
+`PRICE72` at approval would put the system price out of step with every copy
+already in stock, for however long the reprint takes. Staging on `NEWPRICE`
+lets the price move with the new printing, through whatever moves it today —
+and `IVRORRNEWP` then tells production about it with no new code. Writing
+straight to the item is still available (`RPCAPLTGT 'I'`) for when the price
+comes off the back of the book.
+
+Two consequences, both handled:
+
+- A title whose queue row **already** carries a `NEWPRICE` has been priced by a
+  person. The generator skips it, and the applier will not overwrite one that
+  appeared after the suggestion was made.
+- Staging writes **no** `IVPMAINT` row. A `'PRICE72'` row would tell the
+  generator the title had just been repriced and restart its eligibility clock
+  on a price nobody has printed. The row is written by whatever moves `PRICE72`
+  at the new printing — and until then the generator leaves the title alone,
+  because its queue row now carries a `NEWPRICE`. The loop closes by itself.
+
+**The CNO is `NOTEPADI`, not an item code.** `IVRORRNEWP` reads up to four
+note records per item, keyed on item and `RCDNBR`, and decides a price change
+is already covered when a note's `NOTE1` or `NOTE2` contains the word `PRICE`
+and the new price. Its history reads *"Skip printing price change if correction
+note was added"*. So the `IVPITMCODE` mechanism written earlier was pointed at
+the wrong file. It is **switched off** in the seed (`RPCCNOYN 'N'`, blank
+`RPCCNOCOD`) rather than left writing rows to a real file for nothing.
+
+Pointing it at `NOTEPADI` needs that file's field list — no program so far names
+its item field or its record format, and a guess would write malformed notes to
+a file production reads. Worth knowing when it is wired up: a note must format
+the price exactly as `%Char(ORR_NEWPRICE)` does, or `IVRORRNEWP`'s `%Scan` will
+not find it and will report the change twice.
+
+**`RERUNSTS` now has meanings, from the programs that test each value.**
+
+| Value | Meaning | Evidence |
+| --- | --- | --- |
+| blank | hit minimum qty, not yet actioned | `IVRORRIVP2` selects exactly these |
+| `A K B I P` | approved / active | `IVRORRNEWP` selects these (`P` only for dept `BO`) |
+| `N` | not to be rerun | `IVRORRNBR` reports exactly these |
+| `J` | taken off the queue | `IVRMAINT` sets it to remove an item |
+
+Seeded as `RPCSTSLST ' *BLANK A K B I P '` and `RPCSTSEXC ' J N '`. The
+generator previously required a non-blank status, which excluded the Min Qty
+Online population — the earliest point a title can be priced — and let `N`
+through. Both are fixed. A blank is written `*BLANK` because a blank cannot be a
+token. What `A`, `K`, `B`, `I` and `P` each mean individually is still not
+stated anywhere.
+
+**And the due date is now the forecast.** `IVRORRIVP2` prints
+`IVPORRITM.ESTBODT`, the estimated back-order date, alongside quantity available
+and sales — a forecast of when stock runs out, which is what the pricing
+documents mean by due. The generator now uses it, falling back to `MINQTYDT`.
+`MINQTYDT` on its own could not discriminate: it is the date stock *reached*
+its minimum, so it is already past for nearly everything in the queue and the
+6-month horizon would have let almost all of it through.
+
+`IVRORRCLN` also shows items leave the queue routinely — its whole job is
+deleting records for items no longer on `IVPORRITM`. So the applier re-checks
+for the queue row at approval time, not just at generation.
+
 ## Guardrails
 
 - **Eligibility.** A title repriced within `RPCELGMO` months is left alone.
@@ -191,14 +265,17 @@ forgotten suggestion would quietly block production. After `RPCEXPCY` cycles the
 suggestion expires and the CNO comes off, which also lets the next run raise the
 title again rather than forget it.
 
-**The attachment mechanism is provisional.** It is written as an item code on
-`IVPITMCODE`, the only per-item marker of that kind visible in existing code
-(`P1VBTCHUP` writes `'PUR'`). The code is control data (`RPCCNOCOD`), and all
-CNO changes go through `Sbr_Attach_CNO` in `IVRRPCGEN` and `Sbr_Release_CNO` in
-`IVRRPCAPL` — two subroutines and one control field when the real process is
-confirmed. The Pop & Classical re-run page shows the practice already exists
-("A CNO has been added to each book to use new files on rerun"), so this is
-hooking into something real, not inventing it.
+**The attachment mechanism is currently switched off.** It was written against
+`IVPITMCODE`, and `IVRORRNEWP` has since shown the real mechanism is a note
+record on `NOTEPADI` — see *What the online re-run programs settled*. All CNO
+changes are isolated to `Sbr_Attach_CNO` in `IVRRPCGEN` and `Sbr_Release_CNO` in
+`IVRRPCAPL`, so repointing them is two subroutines once `NOTEPADI`'s field list
+is known.
+
+In the meantime the alerting half of the job is partly done already: once an
+approved price is staged as `NEWPRICE`, the existing *Items with New Price*
+report puts it in front of production. What is missing without the CNO is the
+alert **during** review, before a price is approved.
 
 ## Running it
 
@@ -213,6 +290,17 @@ it would be told before it is opened in to phase 1.
 
 ## Open items
 
+**The decision that matters most now:** confirm that approved prices should be
+staged as `IVPORRITM.NEWPRICE` (the default) rather than written straight to
+`PRICE72`, and say **what moves `NEWPRICE` into `PRICE72`** today when the new
+printing happens. Nothing read so far does it. If nothing does — if an editor
+retypes it into `IVRMAINT2` — then staging hands them a number instead of a
+calculation, which is still the phase 1 goal; but it should be known, not
+assumed.
+
+The next most useful thing is **`DSPFFD NOTEPADI`**, which is all that stands
+between the CNO and a working implementation.
+
 These are gaps in what could be confirmed, not loose ends in the build. Each one
 is control data rather than a hard-coded guess, so closing it is a data change.
 
@@ -226,10 +314,9 @@ is control data rather than a hard-coded guess, so closing it is a data change.
    Education and no Self-Teach. If they are one group, map those `DIVCAT`s
    accordingly; if not, one bracket set and one percentage set are missing.
    Seeded faithfully, so model `B` has no `EDU` rows and model `P` no `SFT` rows.
-4. **`RERUNSTS` values — half settled.** `'J'` is confirmed as *not in the
-   queue* and is now excluded via `RPCSTSEXC`. The **inclusion** list is still
-   unknown: `RPCSTSLST` is blank, so the candidate set remains wider than the
-   internal approval queue the Redash report shows. Blocks phase 1.
+4. ~~**`RERUNSTS` values.**~~ **Settled** — see the table under *What the
+   online re-run programs settled*. Left open: the individual meaning of each of
+   `A K B I P`, and whether `P` should count outside dept `BO`.
 5. ~~**`IVPMAINT.FLDNAM` for a price change.**~~ **Settled** — three spellings,
    all three now seeded. See *What the program listings settled*.
 6. **`IVPMAINT` retention.** If rows are purged, a title repriced long ago is
@@ -255,11 +342,12 @@ is control data rather than a hard-coded guess, so closing it is a data change.
 10. ~~**`PRICE72` vs `PRICE112`.**~~ **Settled** — one price in two fields, set
     from the same number. Still open: what should happen to score and part items
     within an Instrumental set, which the sources price as a set.
-11. **Re-run due date.** Taken as the earlier of `IVPORRITM.MINQTYDT` and the
-    `RERUN8` planned finish date. The documents define due as *"stock depletes to
-    reorder floor within 6 months at 2025 sell rate"* — if that forecast exists
-    only in BI, it should feed in rather than being approximated here. The
-    30-day look-back on `RERUN8` dates is a value to confirm.
+11. **Re-run due date — mostly settled.** Now `IVPORRITM.ESTBODT`, the
+    estimated back-order date, with `MINQTYDT` as a fallback and the `RERUN8`
+    planned finish date where earlier. Still to confirm: that back-order (stock
+    out) is close enough to the documents' *"reorder floor"*, and how
+    `ORR_FLG6MO` is set — the only comment on it reads *"if < 6 months, show
+    blanks"*, which is not enough to build on.
 12. **Kill-candidate disposition.** `RULDISP` carries the published disposition
     (`KILLCAND` / `WATCH` / `CULLREV`) on to each suggestion, but nothing acts on
     it yet and "dead" is undefined.
@@ -278,7 +366,9 @@ is control data rather than a hard-coded guess, so closing it is a data change.
 
 `IVRMAINT` (inventory maintenance), `IVRMAINT2` (interactive price change),
 `IVRITEMSM4` (`IVPITEMS` maintenance), `IVRPRCUPD` (price upload: MSRP, MAP,
-`HLCOST`, tier pricing) and `IVRNOPUPD`.
+`HLCOST`, tier pricing), `IVRNOPUPD`, `IVRORRNEWP` (items with new price),
+`IVRORRNBR` (items not to be rerun), `IVRORRIVP2` (min qty online print) and
+`IVRORRCLN` (nightly cleanup).
 
 ## Source documents
 
