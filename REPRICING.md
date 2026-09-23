@@ -311,13 +311,82 @@ it would be told before it is opened in to phase 1.
 
 ## Open items
 
-**The decision that matters most now:** confirm that approved prices should be
-staged as `IVPORRITM.NEWPRICE` (the default) rather than written straight to
-`PRICE72`, and say **what moves `NEWPRICE` into `PRICE72`** today when the new
-printing happens. Nothing read so far does it. If nothing does — if an editor
-retypes it into `IVRMAINT2` — then staging hands them a number instead of a
-calculation, which is still the phase 1 goal; but it should be known, not
-assumed.
+**Settled: nothing moves `NEWPRICE` into `PRICE72`. A person does it.**
+A search of `SOURCE/QRPGLESRC` finds 26 members that mention `NEWPRICE`, and
+not one assigns it to `PRICE72`. For every item whose queue row shows the new
+price applied (`NEWPRICE = PRICE72`), the `IVPMAINT` row for that price change
+was written by a named user. What the code does with `NEWPRICE`:
+
+| Role | Programs |
+| --- | --- |
+| **Typed in** on a screen | `IVRORRINV1` (inventory), `IVRORRMKTC` (marketing change), `IVRORRPRDC` (production change), `MIVPOAPRV` (purchasing) |
+| **Written by batch** | `IVRORRNWPR` — sets it from another file; no description on the member |
+| **Cleared** | `PCRNTFYPO` (item added to the queue from an agency PO) |
+| **Shown instead of the current price**, highlighted | `IVRORRMKT`, `IVRORRPB` (print buyer), `IVRIMPAGCY`, `IVRIMPORD` |
+| **Printed / tested** | `IVRORRNEWP`, `IVRORRPRD1`, `IVRORRPRD2`, `IVRCALCDT`, `IVRORRUPD1` |
+
+So the house flow is: the new price is shown to production and the print buyer
+in place of the old one, and someone keys it into item maintenance around the
+reprint. This process fits that as built — phase 1 hands them a calculated
+number instead of one they work out.
+
+What it means for **phase 2**: "applies automatically" needs a step that does
+not exist today — something that moves `NEWPRICE` into `PRICE72` when the
+reprint happens. The natural trigger is the job closing or the stock arriving;
+`ACRCLSJOB`, `JOBMAINT` and `JOBACD` read the queue and can update the item, so
+one of them is the place to look. That step must also call `IVRUDRLITM`, below.
+
+Two things to check before a pilot:
+
+- **`IVRORRNWPR` writes `NEWPRICE` in batch.** If it runs routinely it could
+  overwrite a price this process staged — the applier refuses to overwrite a
+  person's `NEWPRICE`, but nothing stops `IVRORRNWPR` overwriting ours. Its
+  source is the one to read next.
+- **The search covered `SOURCE/QRPGLESRC` only.** Older RPG III source in
+  `QRPGSRC`, or source in another library, was not searched. The
+  cross-reference found programs that read the queue and can update the item
+  without mentioning `NEWPRICE` at all — including three CNO programs,
+  `IVRCNOUPD`, `IVRICNO` and `IVVICNO`, which should be read regardless, to
+  confirm `NOTEPADI` is the only place a CNO lives.
+
+**Price changes propagate through `IVRUDRLITM`.** When a hardgood's price
+changes, `IVRUDRLITM(item, price)` gives its related item the same price and
+every eBook the same price, less 20% for an HL digital book, with `IVPMAINT`
+rows marked *"Change made by IVRUDRLITM"*. `IVRMAINT`'s history says eBook
+price updates are *"now done in IVRUDRLITM"*. The direct-to-item path
+(`RPCAPLTGT 'I'`) now calls it; before this it would have left eBooks at the old
+price. Nothing read so far calls it directly, so it is probably reached through
+`IVRUPDTPRC`, or a trigger on `IVPITEMS` — `DSPFD FILE(OBJECT/IVPITEMS)
+TYPE(*TRG)` will say. If it is a trigger, the explicit call only adds a duplicate
+audit row for the related item.
+
+**Unidentified: `DADSYUGI`.** Most recent `IVPMAINT` price rows carry it as
+`MAINTWHO`, and it is neither a program nor a current user. Candidates, with the
+command that confirms each:
+
+- a display device — `WRKDEVD DEVD(DADSYUGI)`. For an interactive job the job
+  name *is* the device name, so a program writing the job name instead of the
+  user into `MAINTWHO` would produce exactly this.
+- a deleted or service profile — `DSPUSRPRF USRPRF(DADSYUGI)`, and the dates
+  below: rows that stop on one day suggest someone who left.
+- a batch job name — `WRKJOBSCDE` for a scheduled entry of that name.
+
+Which program writes it shows up in the audit rows themselves:
+
+```sql
+SELECT MAINTWHO, UPPER(TRIM(FLDNAM)) AS FLD, COMMENT, COUNT(*) AS N,
+       MIN(MAINTYYYY * 10000 + MAINTMM * 100 + MAINTDD) AS FIRST_DT,
+       MAX(MAINTYYYY * 10000 + MAINTMM * 100 + MAINTDD) AS LAST_DT
+  FROM OBJECT/IVPMAINT
+ WHERE UPPER(TRIM(FLDNAM)) IN ('PRICE', 'PRICE72', 'PRICE112')
+   AND MAINTYYYY >= 2025
+ GROUP BY MAINTWHO, UPPER(TRIM(FLDNAM)), COMMENT
+ ORDER BY N DESC
+```
+
+It matters here because a `MAINTWHO` that is really a device or a batch job
+means some price changes cannot be traced to a person — relevant if phase 2 is
+ever audited.
 
 These are gaps in what could be confirmed, not loose ends in the build. Each one
 is control data rather than a hard-coded guess, so closing it is a data change.
@@ -385,8 +454,11 @@ is control data rather than a hard-coded guess, so closing it is a data change.
 `IVRMAINT` (inventory maintenance), `IVRMAINT2` (interactive price change),
 `IVRITEMSM4` (`IVPITEMS` maintenance), `IVRPRCUPD` (price upload: MSRP, MAP,
 `HLCOST`, tier pricing), `IVRNOPUPD`, `IVRORRNEWP` (items with new price),
-`IVRORRNBR` (items not to be rerun), `IVRORRIVP2` (min qty online print) and
-`IVRORRCLN` (nightly cleanup).
+`IVRORRNBR` (items not to be rerun), `IVRORRIVP2` (min qty online print),
+`IVRORRCLN` (nightly cleanup) and `IVRUDRLITM` (price propagation to related
+items and eBooks). Plus a `FNDSTRPDM` of `NEWPRICE` across `SOURCE/QRPGLESRC`
+and a `DSPPGMREF` cross-reference of programs that read the re-run queue and can
+update the item master.
 
 ## Source documents
 

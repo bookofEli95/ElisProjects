@@ -87,6 +87,9 @@
       // library. A hand-rolled structure named SdsUser resolves to
       // positions 1-10, the program name, not the user profile.
       /copy qcopysrc,statusds
+      // Price propagation to the related item and every eBook - see
+      // Sbr_Apply_Item.
+      /copy qcopysrc,ivrudrlitm
 
       // Entry parameters
      D PrmMode         S              1A
@@ -119,6 +122,8 @@
      D WrkApplied      S              1A   Inz('N')
      D WrkAudAct       S             20A   Inz(*Blanks)
      D WrkStsTok       S             10A   Inz(*Blanks)
+     D WrkPrmItm       S              8A   Inz(*Blanks)
+     D WrkPrmPrc       S              8A   Inz(*Blanks)
       // The new price in the same type as IVPORRITM.NEWPRICE, so %Char of
       // it is character for character what IVRORRNEWP scans a note for.
       // Formatting it from a field of a different length or scale could
@@ -588,6 +593,21 @@
                WrkAfter  = %Trim(%Char(ITM_PRICE112));
                Exsr Sbr_Write_Maint;
             Endif;
+
+            // The related item and every eBook follow a hardgood's price,
+            // and in this library that is IVRUDRLITM's job: IVRMAINT's
+            // history reads "Remove Subroutine for eBook price update,
+            // now done in IVRUDRLITM". It gives the related item the same
+            // price and each eBook the same price - less 20% for an HL
+            // digital book - and writes their IVPMAINT rows. Without it
+            // the eBooks would keep the old price.
+            //
+            // If IVPITEMS turns out to carry a trigger that already calls
+            // it, this call only adds a duplicate audit row for the
+            // related item; eBooks at the right price are left alone.
+            WrkPrmItm = %Editc(WrkSugItem : 'X');
+            WrkPrmPrc = %Char(WrkNew72);
+            Callp IVRUDRLITM(WrkPrmItm : WrkPrmPrc);
 
             WrkApplied = 'Y';
 
