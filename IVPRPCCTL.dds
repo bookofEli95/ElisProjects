@@ -60,6 +60,8 @@
      A                                      COLHDG('P112' 'Y/N')
      A            RPCAPLTGT      1A         TEXT('Apply to Q=queue I=item')
      A                                      COLHDG('APPLY' 'TARGET')
+     A            RPCPRCUACT     1A         TEXT('2022 staged price D or S')
+     A                                      COLHDG('PRCU' 'ACTION')
      A            RPCMNTTS        Z         TEXT('Last maintained timestamp')
      A                                      COLHDG('MAINT' 'TS')
      A            RPCMNTWHO     10A         TEXT('Last maintained by')

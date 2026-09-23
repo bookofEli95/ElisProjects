@@ -175,6 +175,7 @@
      D WrkCntWrote     S             10I 0 Inz(0)
      D WrkCntQNew      S             10I 0 Inz(0)
      D WrkCntPrcu      S             10I 0 Inz(0)
+     D WrkPrcuPrc      S                   Like(PRU_NEWPRICE) Inz(0)
      D WrkCntNoQue     S             10I 0 Inz(0)
      D WrkQueRow       S              1A   Inz('N')
 
@@ -509,21 +510,17 @@
                Leavesr;
             Endif;
 
-            // 2c. A price is already waiting for this title in IVPORRPRCU.
-            //     IVRORRNWPR ("Auto populate the New Price field in the
-            //     rerun program for items needing price increases") copies
-            //     it into NEWPRICE when the title reaches the queue with a
-            //     blank status. A suggestion now would be overtaken by it,
-            //     after an editor had spent time approving one.
-            //
-            //     Only while the staged price is still current, by the same
-            //     test IVRORRNWPR applies: if PRICE112 has moved since the
-            //     row was staged, IVRORRNWPR deletes it instead of using it,
-            //     so the title is fair game here.
+            // 2c. Is a price still staged for this title in IVPORRPRCU?
+            //     That file is a one-off load from January 2022, which
+            //     IVRORRNWPR copies into NEWPRICE when a title reaches the
+            //     queue with a blank status. A row only counts while it is
+            //     current - PRICE112 unchanged since it was staged - which
+            //     is the test IVRORRNWPR itself applies. What to do about
+            //     one is the catalogue's call, at step 3b.
+            WrkPrcuPrc = 0;
             Chain (WrkCndItem) IVPORRPRCU;
             If %Found(IVPORRPRCU) And PRU_PRICE112 = ITM_PRICE112;
-               WrkCntPrcu += 1;
-               Leavesr;
+               WrkPrcuPrc = PRU_NEWPRICE;
             Endif;
 
             // 3. This catalogue's control row, falling back to the
@@ -546,6 +543,18 @@
             //     date can be the earlier.
             If CTL_RPCAPLTGT <> 'I' And WrkQueRow = 'N';
                WrkCntNoQue += 1;
+               Leavesr;
+            Endif;
+
+            // 3c. A current 2022 staged price. RPCPRCUACT 'D' defers to it:
+            //     no suggestion, and the 2022 price stands, as it would
+            //     without this process. 'S' supersedes it: the suggestion
+            //     goes ahead and shows the 2022 price, so the editor sees
+            //     both numbers. A current row is a title unrepriced since
+            //     2022 - exactly what this project is for - so 'D' should
+            //     be a deliberate choice for a catalogue, not a default.
+            If WrkPrcuPrc > 0 And CTL_RPCPRCUACT <> 'S';
+               WrkCntPrcu += 1;
                Leavesr;
             Endif;
 
@@ -968,6 +977,14 @@
                SUG_RPCNOTE = RulText(WrkRulIdx);
             Endif;
 
+            // Superseding a 2022 staged price: say so on the suggestion,
+            // with the price, so the editor is choosing between the two
+            // rather than overwriting one they never saw.
+            If WrkPrcuPrc > 0 And WrkAuthHld <> 'H';
+               SUG_RPCNOTE = 'SUPERSEDES 2022 STAGED PRICE ' +
+                             %Trim(%Char(WrkPrcuPrc)) + ' (IVPORRPRCU)';
+            Endif;
+
             Write IV$RPCSUG;
 
             Exsr Sbr_Write_Audit;
@@ -1015,7 +1032,7 @@
             Dsply ('Skip no rise    : ' + %Char(WrkCntNoRise));
             Dsply ('Skip authority  : ' + %Char(WrkCntAuth));
             Dsply ('Skip priced now : ' + %Char(WrkCntQNew));
-            Dsply ('Skip in PRCU    : ' + %Char(WrkCntPrcu));
+            Dsply ('Defer to 2022   : ' + %Char(WrkCntPrcu));
             Dsply ('Skip no queue   : ' + %Char(WrkCntNoQue));
 
          Endsr;

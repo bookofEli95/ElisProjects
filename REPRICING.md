@@ -361,21 +361,68 @@ Two things to check before a pilot:
   so it cannot overwrite a price this process staged; and this process will not
   overwrite one it set. First writer wins, both ways.
 
-  And **it is live: `IVPORRPRCU` holds 4,382 staged prices** (row count, 23
-  Sep 2026). So an earlier version of this idea already exists and has been
-  loaded at scale, whatever the release page says about no suggestion step
-  existing. Each row waits for its title to reach the re-run queue with a blank
-  status, then becomes `NEWPRICE`.
+  **`IVPORRPRCU` is a one-off load from January 2022, being drained slowly.**
+  The file (*"IV: Online Rerun item price updates"*: `ITMNUM`, `DIVCAT`,
+  `SERIES`, `BNDNAM` "Band Grade Name", `PRICE112`, `NEWPRICE`) was created on
+  17 Jan 2022. Across 8,779 source members only `IVRORRNWPR` references it, so
+  no program loads it. It holds 4,382 rows with 111 used or removed since; the
+  last change, 22 Sep 2026, is most likely `IVRORRNWPR` taking one more.
 
-  The generator now **skips any title with a current row in `IVPORRPRCU`**
-  (current meaning `PRICE112` has not moved since it was staged — the same test
-  `IVRORRNWPR` applies before using one). Otherwise an editor could approve a
-  suggestion only for `IVRORRNWPR` to overtake it. Report mode counts these as
-  *Skip in PRCU*, so a dry run shows the overlap per catalogue.
+  Its rises match neither 2026 pricing document:
 
-  Still unknown: when those rows were loaded, from what, and by which rule. If
-  they came from the pricing documents, they are also the best available test of
-  the rule table here — real prices someone already decided on.
+  | Rise | Rows | Likely |
+  | --- | --- | --- |
+  | +$0.15 | 1,711 | one step up the Choral octavo ladder |
+  | +$0.10 | 1,553 | one step up the Choral octavo ladder |
+  | +$5.00 | 834 | band sets, priced by grade (`BNDNAM`) |
+  | +$10.00 | 180 | band sets, priced by grade |
+  | +$0.05 | 103 | not a step on the published ladder |
+  | +$1.00 | 1 | |
+
+  +$0.10 and +$0.15 are exactly the steps between the ladder rungs from $2.10
+  to $2.75; the rung pairs themselves would confirm it (query below).
+
+  **Why it matters:** a row is only still current if the title's price has not
+  moved since 2022 — which is precisely the frozen back catalogue this project
+  is for. Left alone, `IVRORRNWPR` gives each of those titles its 2022 rise when
+  it reaches the queue, and this process then leaves the title alone because
+  `NEWPRICE` is set. For octavos that may be harmless — one ladder step from
+  $2.50 is $2.65 under both the 2022 load and the 2026 ladder rule. For a $45
+  band set it is +$5 where the 2026 rules give roughly +$6 to +$16.
+
+  So it is now a **per-catalogue decision**, `RPCPRCUACT`:
+
+  - `'D'` defer — no suggestion; the 2022 price stands. The seed, only because it
+    is what happens today without this process.
+  - `'S'` supersede — the suggestion goes ahead and its note reads *"SUPERSEDES
+    2022 STAGED PRICE n.nn (IVPORRPRCU)"*, so the editor chooses between the two.
+    Then retire that catalogue's staged rows, or `IVRORRNWPR` may copy the 2022
+    price into `NEWPRICE` before the editor approves:
+    `DELETE FROM OBJECT/IVPORRPRCU WHERE DIVCAT = <catalogue>`. If that is
+    forgotten, the applier rejects the approval visibly (*"QUEUE ALREADY HAS A
+    NEW PRICE"*) rather than overwriting.
+
+  To see which rungs the small rises are, and how many rows are still current:
+
+  ```sql
+  SELECT PRICE112, NEWPRICE, COUNT(*) AS N
+    FROM OBJECT/IVPORRPRCU
+   WHERE NEWPRICE - PRICE112 < 1
+   GROUP BY PRICE112, NEWPRICE
+   ORDER BY N DESC
+   FETCH FIRST 20 ROWS ONLY
+
+  SELECT P.DIVCAT,
+         SUM(CASE WHEN P.PRICE112 = I.PRICE112 THEN 1 ELSE 0 END) AS CURRENT_ROWS,
+         SUM(CASE WHEN P.PRICE112 <> I.PRICE112 THEN 1 ELSE 0 END) AS STALE_ROWS
+    FROM OBJECT/IVPORRPRCU P
+    JOIN OBJECT/IVPITEMS I ON I.ITMNUM = P.ITMNUM
+   GROUP BY P.DIVCAT
+   ORDER BY CURRENT_ROWS DESC
+  ```
+
+  The second is the one to run before opting a catalogue in: it says how many of
+  its titles the `'D'`/`'S'` choice actually affects.
 - **The search covered `SOURCE/QRPGLESRC` only.** Older RPG III source in
   `QRPGSRC`, or source in another library, was not searched. The
   cross-reference found programs that read the queue and can update the item
