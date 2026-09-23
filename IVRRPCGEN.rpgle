@@ -50,6 +50,11 @@
      FIVPORRITM IF   E           K DISK    EXTFILE('OBJECT/IVPORRITM')
      F                                     EXTDESC('OBJECT/IVPORRITM')
      F                                     PREFIX(ORR_)
+      // Prices already staged for the re-run queue, which IVRORRNWPR copies
+      // into NEWPRICE - see step 2c.
+     FIVPORRPRCUIF   E           K DISK    EXTFILE('OBJECT/IVPORRPRCU')
+     F                                     EXTDESC('OBJECT/IVPORRPRCU')
+     F                                     PREFIX(PRU_)
 
       // Update / Add Files
      FIVPRPCSUG UF A E           K DISK    EXTFILE('OBJECT/IVPRPCSUG')
@@ -169,6 +174,7 @@
      D WrkCntAuth      S             10I 0 Inz(0)
      D WrkCntWrote     S             10I 0 Inz(0)
      D WrkCntQNew      S             10I 0 Inz(0)
+     D WrkCntPrcu      S             10I 0 Inz(0)
      D WrkCntNoQue     S             10I 0 Inz(0)
      D WrkQueRow       S              1A   Inz('N')
 
@@ -500,6 +506,23 @@
             If WrkQueRow = 'Y' And ORR_NEWPRICE <> 0
                And ORR_NEWPRICE <> ITM_PRICE72;
                WrkCntQNew += 1;
+               Leavesr;
+            Endif;
+
+            // 2c. A price is already waiting for this title in IVPORRPRCU.
+            //     IVRORRNWPR ("Auto populate the New Price field in the
+            //     rerun program for items needing price increases") copies
+            //     it into NEWPRICE when the title reaches the queue with a
+            //     blank status. A suggestion now would be overtaken by it,
+            //     after an editor had spent time approving one.
+            //
+            //     Only while the staged price is still current, by the same
+            //     test IVRORRNWPR applies: if PRICE112 has moved since the
+            //     row was staged, IVRORRNWPR deletes it instead of using it,
+            //     so the title is fair game here.
+            Chain (WrkCndItem) IVPORRPRCU;
+            If %Found(IVPORRPRCU) And PRU_PRICE112 = ITM_PRICE112;
+               WrkCntPrcu += 1;
                Leavesr;
             Endif;
 
@@ -992,6 +1015,7 @@
             Dsply ('Skip no rise    : ' + %Char(WrkCntNoRise));
             Dsply ('Skip authority  : ' + %Char(WrkCntAuth));
             Dsply ('Skip priced now : ' + %Char(WrkCntQNew));
+            Dsply ('Skip in PRCU    : ' + %Char(WrkCntPrcu));
             Dsply ('Skip no queue   : ' + %Char(WrkCntNoQue));
 
          Endsr;

@@ -361,13 +361,21 @@ Two things to check before a pilot:
   so it cannot overwrite a price this process staged; and this process will not
   overwrite one it set. First writer wins, both ways.
 
-  But it means **an earlier version of this idea already exists.** Something may
-  still be loading `IVPORRPRCU` — perhaps the suggested-price spreadsheets the
-  quarterly re-run pages attach — and if so, two sources are proposing prices for
-  the same titles. Worth one query before a pilot:
-  `SELECT COUNT(*) FROM OBJECT/IVPORRPRCU`, and in `IVPORRMNT` the most recent
-  rows with `ACTION = 'New price'` and `MAINTWHO = 'IS'`, which is how
-  `IVRORRNWPR` signs its work.
+  And **it is live: `IVPORRPRCU` holds 4,382 staged prices** (row count, 23
+  Sep 2026). So an earlier version of this idea already exists and has been
+  loaded at scale, whatever the release page says about no suggestion step
+  existing. Each row waits for its title to reach the re-run queue with a blank
+  status, then becomes `NEWPRICE`.
+
+  The generator now **skips any title with a current row in `IVPORRPRCU`**
+  (current meaning `PRICE112` has not moved since it was staged — the same test
+  `IVRORRNWPR` applies before using one). Otherwise an editor could approve a
+  suggestion only for `IVRORRNWPR` to overtake it. Report mode counts these as
+  *Skip in PRCU*, so a dry run shows the overlap per catalogue.
+
+  Still unknown: when those rows were loaded, from what, and by which rule. If
+  they came from the pricing documents, they are also the best available test of
+  the rule table here — real prices someone already decided on.
 - **The search covered `SOURCE/QRPGLESRC` only.** Older RPG III source in
   `QRPGSRC`, or source in another library, was not searched. The
   cross-reference found programs that read the queue and can update the item
