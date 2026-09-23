@@ -67,9 +67,12 @@
      FIVPORRITM UF   E           K DISK    EXTFILE('OBJECT/IVPORRITM')
      F                                     EXTDESC('OBJECT/IVPORRITM')
      F                                     PREFIX(ORR_)
-     FNOTEPADI  UF   E           K DISK    EXTFILE('OBJECT/NOTEPADI')
+     FNOTEPADI  UF A E           K DISK    EXTFILE('OBJECT/NOTEPADI')
      F                                     EXTDESC('OBJECT/NOTEPADI')
      F                                     PREFIX(NTE_)
+     FMFPUSERS  IF   E           K DISK    EXTFILE('OBJECT/MFPUSERS')
+     F                                     EXTDESC('OBJECT/MFPUSERS')
+     F                                     PREFIX(USR_)
 
       // Output Files
      FIVPMAINT  O    E           K DISK    EXTFILE('OBJECT/IVPMAINT')
@@ -123,6 +126,26 @@
      D WrkAudAct       S             20A   Inz(*Blanks)
      D WrkStsTok       S             10A   Inz(*Blanks)
      D WrkPrmItm       S              8A   Inz(*Blanks)
+
+      // One page of the item note pad. A NOTEPADI record is a page, not a
+      // note: NOTE1 and NOTE2 together are 13 lines of 34 characters, and
+      // one page holds several corrections one after another. This is the
+      // same overlay IVRICNO and IVRCNOUPD use (their Tablet structure).
+     D WrkPad          DS
+     D  WrkPart1               1    256
+     D  WrkPart2             257    442
+     D  WrkLin                 1    442    Dim(13)
+
+     D WrkPg           S                   Like(NTE_RCDNBR) Inz(0)
+     D WrkCnoPg        S                   Like(NTE_RCDNBR) Inz(0)
+     D WrkLn           S              2S 0 Inz(0)
+     D WrkCnoLn        S              2S 0 Inz(0)
+     D WrkSepOk        S              1A   Inz('N')
+     D WrkEmpty        S              1A   Inz('N')
+     D WrkHdr          S             34A   Inz(*Blanks)
+     D WrkName         S             17A   Inz(*Blanks)
+     D WrkCntCno       S             10I 0 Inz(0)
+     D WrkCntCnoFull   S             10I 0 Inz(0)
      D WrkPrmPrc       S              8A   Inz(*Blanks)
       // The new price in the same type as IVPORRITM.NEWPRICE, so %Char of
       // it is character for character what IVRORRNEWP scans a note for.
@@ -279,6 +302,17 @@
                   Unlock IVPRPCSUG;
                   Leavesr;
                Endif;
+            Endif;
+
+            // Every open suggestion gets its correction note (CNO) the
+            // first time it passes through here - which, in the monthly
+            // job, is minutes after IVRRPCGEN raised it. Held rows get one
+            // too: a title waiting on a pricing-authority check is exactly
+            // one that must not be reprinted at the old price meanwhile.
+            If CTL_RPCCNOYN = 'Y' And SUG_RPCCNOFL <> 'Y'
+               And ( SUG_RPCSTAT = 'S' Or SUG_RPCSTAT = 'G'
+                  Or SUG_RPCSTAT = 'A' Or SUG_RPCSTAT = 'O' );
+               Exsr Sbr_Attach_CNO;
             Endif;
 
             // Decide what this row is: applied now, expired, or left.
@@ -701,33 +735,86 @@
       /end-free
 
       //***********************************************************************
+      //* Subroutine: Attach the CNO
+      //***********************************************************************
+      /free
+         Begsr Sbr_Attach_CNO;
+
+            // A correction note (CNO) is written exactly as an editor's is
+            // in IVRICNO, and as IVRCNOUPD writes mass corrections: a
+            // header line "Correction MM/YY <name>", then body lines of at
+            // most 34 characters, placed in the first gap on the first page
+            // with room, after one blank separator line. Nothing already on
+            // the page moves. Because it is the item's pop-up note pad,
+            // anyone who opens the item sees it - which is the alert the
+            // release asks for.
+            //
+            // The second line carries "(IVRRPC)". That marker is how this
+            // program finds its own four lines again, and the only lines it
+            // will ever change. If an editor removes it, the note is theirs.
+            Exsr Sbr_Cno_Find;
+            If WrkCnoPg = 0;
+               Exsr Sbr_Cno_Gap;
+            Endif;
+
+            // No room on any of the four pages. Nobody else's correction is
+            // moved to make some. The suggestion goes ahead without one,
+            // and once a price is staged IVRORRNEWP reports it to
+            // production anyway, since no note carries it.
+            If WrkCnoPg = 0 Or WrkCnoLn > 10;
+               WrkCntCnoFull += 1;
+               Leavesr;
+            Endif;
+
+            // No price in these lines, deliberately. IVRORRNEWP treats a
+            // change as covered when a note holds the word PRICE and the
+            // text of NEWPRICE anywhere in it, so any number here could
+            // later match a different NEWPRICE and hide it from production.
+            Exsr Sbr_Cno_Header;
+            WrkLin(WrkCnoLn)     = WrkHdr;
+            WrkLin(WrkCnoLn + 1) = 'Price review pending (IVRRPC)';
+            WrkLin(WrkCnoLn + 2) = 'Do not reprint at the current';
+            WrkLin(WrkCnoLn + 3) = 'price until new price is set.';
+            Exsr Sbr_Cno_Save;
+            Exsr Sbr_Cno_Flags_On;
+
+            SUG_RPCCNOFL  = 'Y';
+            SUG_RPCCNORCD = WrkCnoPg;
+            WrkCntCno += 1;
+
+            // Save the flag now, then take the lock back: every path after
+            // this one ends in an Update or an Unlock of the suggestion.
+            Update IV$RPCSUG;
+            Chain (WrkSugItem : WrkSugCycl) IVPRPCSUG;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
       //* Subroutine: Release the CNO
       //***********************************************************************
       /free
          Begsr Sbr_Release_CNO;
 
-            // The CNO is the NOTEPADI record IVRRPCGEN wrote, whose
-            // RCDNBR is kept on the suggestion. It is only deleted while it
-            // is still recognisably ours: if an editor has rewritten it
-            // and the "(IVRRPC" marker is gone, it has become their note
-            // and it stays.
-            If SUG_RPCCNORCD = 0;
-               SUG_RPCCNOFL = 'N';
-               Leavesr;
-            Endif;
-
-            Chain (WrkSugItem : SUG_RPCCNORCD) NOTEPADI;
-            If %Found(NOTEPADI);
-               If %Scan('(IVRRPC' : NTE_NOTE1) > 0;
-                  Delete NOTEPAD$;
+            // Blank this process's four lines and nothing else on the page,
+            // then tidy up the way IVRICNO does when a note is removed.
+            If SUG_RPCCNOFL = 'Y';
+               Exsr Sbr_Cno_Find;
+               If WrkCnoPg > 0;
+                  For WrkLn = WrkCnoLn To WrkCnoLn + 3;
+                     If WrkLn <= 13;
+                        WrkLin(WrkLn) = *Blanks;
+                     Endif;
+                  Endfor;
+                  Exsr Sbr_Cno_Save;
                   WrkDel += 1;
-               Else;
-                  Unlock NOTEPADI;
+                  Exsr Sbr_Cno_Tidy;
                Endif;
             Endif;
 
             SUG_RPCCNOFL  = 'N';
             SUG_RPCCNORCD = 0;
+            SUG_RPCCNOSET = 'N';
 
          Endsr;
       /end-free
@@ -738,58 +825,260 @@
       /free
          Begsr Sbr_Price_CNO;
 
-            // Once a price is decided, the "review pending" note is
-            // rewritten as the note an editor would write by hand: the
-            // word PRICE and the new price. That is the form IVRORRNEWP
-            // recognises as a change production already knows about
-            // (history: "Skip printing price change if correction note
-            // was added"), so the item is not reported twice. The note is
-            // left in place afterwards, like any other CNO - it is now
-            // the instruction for the reprint.
+            // Once a price is decided the same four lines are rewritten as
+            // the correction an editor would type: the word PRICE and the
+            // new price on one line. That is what IVRORRNEWP recognises as
+            // a change production already knows about (history: "Skip
+            // printing price change if correction note was added"), so the
+            // item is not reported twice. The note then stays, like any
+            // other CNO - it is the instruction for the reprint.
             //
-            // No note of ours on the item - the CNO was switched off, or
-            // all four note records were taken - means nothing to
-            // rewrite. The staged NEWPRICE then puts the item on the
-            // Items with New Price report instead, which is the house
-            // fallback for a change with no CNO.
-            If SUG_RPCCNORCD = 0;
-               SUG_RPCCNOFL = 'N';
+            // The price line must not be line 8 of the page: NOTE1 ends
+            // part-way through it, and IVRORRNEWP scans NOTE1 and NOTE2
+            // separately, so a price split across them would not be found.
+            // Sbr_Cno_Gap never places a block that way; one an editor has
+            // moved there only costs a duplicate line on that report.
+            If SUG_RPCCNOFL <> 'Y';
                Leavesr;
             Endif;
 
-            Chain (WrkSugItem : SUG_RPCCNORCD) NOTEPADI;
-            If Not %Found(NOTEPADI);
-               SUG_RPCCNOFL  = 'N';
-               SUG_RPCCNORCD = 0;
-               Leavesr;
-            Endif;
-            If %Scan('(IVRRPC' : NTE_NOTE1) = 0;
-               // An editor has made this note their own. Leave it.
-               Unlock NOTEPADI;
+            Exsr Sbr_Cno_Find;
+            If WrkCnoPg = 0 Or WrkCnoLn > 10;
                SUG_RPCCNOFL  = 'N';
                SUG_RPCCNORCD = 0;
                Leavesr;
             Endif;
 
-            // The new price is the only number in the note. IVRORRNEWP
-            // matches %Char(NEWPRICE) anywhere in the text, so a second
-            // number - the old price, say - could later be matched by a
-            // different NEWPRICE and hide a real change from production.
-            //
-            // That scan has one weakness this cannot remove: it matches
-            // substrings, so if NEWPRICE is later changed by hand to 3.99
-            // the 13.99 in this note still "covers" it. The same is true
-            // of every hand-typed CNO. The fix belongs in IVRORRNEWP.
-            WrkCnoPrc   = WrkNew72;
-            NTE_NOTE1   = 'PRICE CHANGE ON RERUN (IVRRPCAPL) - ' +
-                          'NEW PRICE ' + %Trim(%Char(WrkCnoPrc));
-            NTE_NOTE2   = *Blanks;
-            NTE_CHGTS   = %Timestamp();
-            NTE_CHGUSER = WrkUser;
-            Update NOTEPAD$;
+            WrkCnoPrc = WrkNew72;
+            Exsr Sbr_Cno_Header;
+            WrkLin(WrkCnoLn)     = WrkHdr;
+            WrkLin(WrkCnoLn + 1) = 'Price change on rerun (IVRRPC)';
+            WrkLin(WrkCnoLn + 2) = 'New price ' + %Trim(%Char(WrkCnoPrc));
+            WrkLin(WrkCnoLn + 3) = 'Reprint at the new price.';
+            Exsr Sbr_Cno_Save;
 
-            SUG_RPCCNOFL = 'Y';
             WrkCntCnoPrc += 1;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Find this process's correction on the note pad
+      //***********************************************************************
+      /free
+         Begsr Sbr_Cno_Find;
+
+            // By its marker line rather than a stored line number, so it is
+            // still found if an editor has added or removed lines above it.
+            // The header is the line before the marker.
+            WrkCnoPg = 0;
+            WrkCnoLn = 0;
+            For WrkPg = 1 To 4;
+               Exsr Sbr_Cno_Load;
+               For WrkLn = 2 To 13;
+                  If %Scan('(IVRRPC' : WrkLin(WrkLn)) > 0;
+                     WrkCnoPg = WrkPg;
+                     WrkCnoLn = WrkLn - 1;
+                     Leave;
+                  Endif;
+               Endfor;
+               If WrkCnoPg > 0;
+                  Leave;
+               Endif;
+            Endfor;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Find room for a new correction
+      //***********************************************************************
+      /free
+         Begsr Sbr_Cno_Gap;
+
+            // The first place, page by page, where four lines are free and
+            // the line above is blank (or it is the top of the page) - the
+            // rule IVRICNO and IVRCNOUPD follow, except that all four lines
+            // must actually be free: IVRCNOUPD only checks two at the top
+            // of a page and can write over text below them.
+            WrkCnoPg = 0;
+            WrkCnoLn = 0;
+            For WrkPg = 1 To 4;
+               Exsr Sbr_Cno_Load;
+               For WrkLn = 1 To 10;
+                  WrkSepOk = 'Y';
+                  If WrkLn > 1;
+                     If WrkLin(WrkLn - 1) <> *Blanks;
+                        WrkSepOk = 'N';
+                     Endif;
+                  Endif;
+                  If WrkSepOk = 'Y' And WrkLn + 2 <> 8
+                     And WrkLin(WrkLn)     = *Blanks
+                     And WrkLin(WrkLn + 1) = *Blanks
+                     And WrkLin(WrkLn + 2) = *Blanks
+                     And WrkLin(WrkLn + 3) = *Blanks;
+                     WrkCnoPg = WrkPg;
+                     WrkCnoLn = WrkLn;
+                     Leave;
+                  Endif;
+               Endfor;
+               If WrkCnoPg > 0;
+                  Leave;
+               Endif;
+            Endfor;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Read one page of the note pad
+      //***********************************************************************
+      /free
+         Begsr Sbr_Cno_Load;
+
+            Chain(N) (WrkSugItem : WrkPg) NOTEPADI;
+            If %Found(NOTEPADI);
+               WrkPart1 = NTE_NOTE1;
+               WrkPart2 = NTE_NOTE2;
+            Else;
+               Clear WrkPad;
+            Endif;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Write the page back
+      //***********************************************************************
+      /free
+         Begsr Sbr_Cno_Save;
+
+            // WrkPad still holds the page Sbr_Cno_Find or Sbr_Cno_Gap left
+            // it on, with this process's lines changed and nothing else.
+            Chain (WrkSugItem : WrkCnoPg) NOTEPADI;
+            NTE_NOTE1 = WrkPart1;
+            NTE_NOTE2 = WrkPart2;
+            If %Found(NOTEPADI);
+               NTE_CHGTS   = %Timestamp();
+               NTE_CHGUSER = WrkUser;
+               Update NOTEPAD$;
+            Else;
+               NTE_ITMNUM  = WrkSugItem;
+               NTE_RCDNBR  = WrkCnoPg;
+               NTE_ADDTS   = %Timestamp();
+               NTE_ADDUSER = WrkUser;
+               NTE_CHGTS   = %Timestamp();
+               NTE_CHGUSER = WrkUser;
+               Write NOTEPAD$;
+            Endif;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Correction header line
+      //***********************************************************************
+      /free
+         Begsr Sbr_Cno_Header;
+
+            // Built exactly as IVRICNO and IVRCNOUPD build it, so a
+            // correction from this process reads like anyone else's.
+            WrkName = WrkUser;
+            Chain (WrkUser) MFPUSERS;
+            If %Found(MFPUSERS);
+               WrkName = USR_USERNAME;
+            Endif;
+
+            WrkHdr = 'Correction '
+                   + %Subst(%Editc(%Subdt(%Date():*M):'Z'):9:2)
+                   + '/'
+                   + %Subst(%Char(%Date()):3:2)
+                   + ' '
+                   + WrkName;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Correction flags on, as IVRICNO sets them
+      //***********************************************************************
+      /free
+         Begsr Sbr_Cno_Flags_On;
+
+            // IVPORRITM.CNO is set to 'M' only if it was blank, as IVRICNO
+            // and IVRCNOUPD do. RPCCNOSET records that it was this process
+            // that set it, so that it only ever clears a flag it set.
+            Chain (WrkSugItem) IVPORRITM;
+            If %Found(IVPORRITM);
+               If ORR_CNO = *Blanks;
+                  ORR_CNO = 'M';
+                  Update IV$ORRITM %Fields(ORR_CNO);
+                  SUG_RPCCNOSET = 'Y';
+               Else;
+                  Unlock IVPORRITM;
+               Endif;
+            Endif;
+
+            // IVPITEMS.CORRCD 'C' marks an item with correction notes.
+            Chain (WrkSugItem) IVPITEMS;
+            If %Found(IVPITEMS);
+               If ITM_CORRCD <> 'C';
+                  ITM_CORRCD = 'C';
+                  Update IVPITEM$ %Fields(ITM_CORRCD);
+               Else;
+                  Unlock IVPITEMS;
+               Endif;
+            Endif;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Tidy up after a correction is removed
+      //***********************************************************************
+      /free
+         Begsr Sbr_Cno_Tidy;
+
+            // IVRICNO's rule when a note is removed: if all four pages are
+            // now empty, delete the four records and clear CORRCD;
+            // otherwise the item still has corrections and CORRCD stays
+            // 'C'. The queue's CNO flag is cleared as well, but only when
+            // this process was the one that set it.
+            WrkEmpty = 'Y';
+            For WrkPg = 1 To 4;
+               Exsr Sbr_Cno_Load;
+               If WrkPart1 <> *Blanks Or WrkPart2 <> *Blanks;
+                  WrkEmpty = 'N';
+               Endif;
+            Endfor;
+
+            If WrkEmpty = 'Y';
+               For WrkPg = 1 To 4;
+                  Delete (WrkSugItem : WrkPg) NOTEPADI;
+               Endfor;
+
+               Chain (WrkSugItem) IVPITEMS;
+               If %Found(IVPITEMS);
+                  If ITM_CORRCD <> ' ';
+                     ITM_CORRCD = ' ';
+                     Update IVPITEM$ %Fields(ITM_CORRCD);
+                  Else;
+                     Unlock IVPITEMS;
+                  Endif;
+               Endif;
+
+               If SUG_RPCCNOSET = 'Y';
+                  Chain (WrkSugItem) IVPORRITM;
+                  If %Found(IVPORRITM);
+                     If ORR_CNO = 'M';
+                        ORR_CNO = ' ';
+                        Update IV$ORRITM %Fields(ORR_CNO);
+                     Else;
+                        Unlock IVPORRITM;
+                     Endif;
+                  Endif;
+               Endif;
+            Endif;
 
          Endsr;
       /end-free
@@ -867,6 +1156,8 @@
             Dsply ('Reject priced now: ' + %Char(WrkCntQTaken));
             Dsply ('CNOs released    : ' + %Char(WrkDel));
             Dsply ('CNOs now priced  : ' + %Char(WrkCntCnoPrc));
+            Dsply ('CNOs attached    : ' + %Char(WrkCntCno));
+            Dsply ('CNO pad full     : ' + %Char(WrkCntCnoFull));
 
          Endsr;
       /end-free

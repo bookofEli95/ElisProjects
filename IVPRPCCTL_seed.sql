@@ -41,15 +41,16 @@
 --              set, but it keeps the two out if the list is ever
 --              cleared.
 --
---   RPCCNOYN   'Y' - attach a correction note (CNO) to every
---              candidate. A CNO is a record on NOTEPADI, the item's
---              pop-up note pad (up to four read per item, keyed on
---              ITMNUM and RCDNBR). While the review is open the note
---              says not to reprint at the current price; once a price
---              is approved it is rewritten as "PRICE CHANGE ON RERUN -
---              NEW PRICE n.nn", the form IVRORRNEWP recognises as a
---              change production already knows about. Notes carry
---              "(IVRRPC" so that editors' own notes are never touched.
+--   RPCCNOYN   'Y' - attach a correction (CNO) to every open
+--              suggestion, on NOTEPADI, the item's pop-up note pad, in
+--              the house format IVRICNO and IVRCNOUPD use: a
+--              "Correction MM/YY <name>" header and 34-character lines,
+--              in the first gap on the first page with room. It says
+--              not to reprint at the current price while the review is
+--              open, and is rewritten as "New price n.nn" once a price
+--              is approved - the form IVRORRNEWP recognises. Only the
+--              four lines marked "(IVRRPC)" are ever changed; editors'
+--              corrections on the same page are left alone.
 --
 --   RPCAPLTGT  'Q' - an approved price is staged on the re-run queue
 --              as IVPORRITM.NEWPRICE, not written to the item.

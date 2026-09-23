@@ -55,11 +55,6 @@
      FIVPRPCSUG UF A E           K DISK    EXTFILE('OBJECT/IVPRPCSUG')
      F                                     EXTDESC('OBJECT/IVPRPCSUG')
      F                                     PREFIX(SUG_)
-      // The item note pad. A correction note (CNO) is a record here - see
-      // Sbr_Attach_CNO.
-     FNOTEPADI  UF A E           K DISK    EXTFILE('OBJECT/NOTEPADI')
-     F                                     EXTDESC('OBJECT/NOTEPADI')
-     F                                     PREFIX(NTE_)
 
       // Output Files
      FIVPORRMNT O    E           K DISK    EXTFILE('OBJECT/IVPORRMNT')
@@ -155,10 +150,6 @@
      D WrkOpen         S             10I 0 Inz(0)
      D WrkPhase        S              1A   Inz(*Blanks)
      D WrkNote         S             60A   Inz(*Blanks)
-     D WrkCnoFl        S              1A   Inz('N')
-     D WrkCnoRcd       S                   Like(NTE_RCDNBR) Inz(0)
-     D WrkCnoTxt       S                   Like(NTE_NOTE1)
-     D WrkRcd          S                   Like(NTE_RCDNBR) Inz(0)
      D WrkMode         S              1A   Inz('P')
      D WrkUser         S             10A   Inz(*Blanks)
 
@@ -177,9 +168,7 @@
      D WrkCntNoRise    S             10I 0 Inz(0)
      D WrkCntAuth      S             10I 0 Inz(0)
      D WrkCntWrote     S             10I 0 Inz(0)
-     D WrkCntCno       S             10I 0 Inz(0)
      D WrkCntQNew      S             10I 0 Inz(0)
-     D WrkCntCnoFull   S             10I 0 Inz(0)
      D WrkCntNoQue     S             10I 0 Inz(0)
      D WrkQueRow       S              1A   Inz('N')
 
@@ -483,8 +472,6 @@
             WrkCapFl   = 'N';
             WrkFlrFl   = 'N';
             WrkAuthHld = 'N';
-            WrkCnoFl   = 'N';
-            WrkCnoRcd  = 0;
             WrkNote    = *Blanks;
 
             // 1. Item master
@@ -655,12 +642,11 @@
                Leavesr;
             Endif;
 
-            // The CNO goes on before the suggestion is written, so the
-            // suggestion records truthfully whether the item is flagged.
-            If CTL_RPCCNOYN = 'Y';
-               Exsr Sbr_Attach_CNO;
-            Endif;
-
+            // The correction note (CNO) is not attached here. Everything
+            // that touches the item note pad and its flags lives in one
+            // program, IVRRPCAPL, which runs straight after this one in the
+            // monthly job and attaches it to every open suggestion that
+            // does not have one yet.
             Exsr Sbr_Write_Suggestion;
             WrkCntWrote += 1;
 
@@ -905,96 +891,6 @@
       /end-free
 
       //***********************************************************************
-      //* Subroutine: Attach the CNO to a re-run candidate
-      //***********************************************************************
-      /free
-         Begsr Sbr_Attach_CNO;
-
-            // A correction note (CNO) is a record on NOTEPADI, the item's
-            // pop-up note pad, keyed on item and RCDNBR. IVRORRNEWP reads
-            // records 1 to 4 of it and treats a note that contains the
-            // word PRICE and the new price as a price change production
-            // already knows about. That is the house mechanism, so it is
-            // the one used here.
-            //
-            // At this point the review is still open and there is no new
-            // price, so the note says so. Because it is the pop-up note
-            // pad, anyone who opens the item sees it - which is the alert
-            // the release asks for.
-            //
-            // The note carries "(IVRRPCGEN)" so that this process can
-            // always tell its own note from one an editor typed, and never
-            // touches theirs. If an editor rewrites it and the marker goes,
-            // the note becomes theirs.
-            WrkCnoFl  = 'N';
-            WrkCnoRcd = 0;
-
-            // Reuse a note of ours already on the item, if a previous
-            // cycle left one, rather than pile up another.
-            For WrkRcd = 1 To 4;
-               Chain(N) (WrkCndItem : WrkRcd) NOTEPADI;
-               If %Found(NOTEPADI)
-                  And %Scan('(IVRRPC' : NTE_NOTE1) > 0;
-                  WrkCnoRcd = WrkRcd;
-                  Leave;
-               Endif;
-            Endfor;
-
-            // Otherwise the first free record of the four IVRORRNEWP reads.
-            If WrkCnoRcd = 0;
-               For WrkRcd = 1 To 4;
-                  Setll (WrkCndItem : WrkRcd) NOTEPADI;
-                  If Not %Equal(NOTEPADI);
-                     WrkCnoRcd = WrkRcd;
-                     Leave;
-                  Endif;
-               Endfor;
-            Endif;
-
-            // All four in use by other notes. Nobody's note is overwritten
-            // to make room. The item still gets its suggestion, and once a
-            // price is staged IVRORRNEWP reports it to production anyway,
-            // because no note carries it.
-            If WrkCnoRcd = 0;
-               WrkCntCnoFull += 1;
-               Leavesr;
-            Endif;
-
-            // No price in this note, deliberately. IVRORRNEWP decides a
-            // change is covered by scanning a note for the word PRICE and
-            // the text of NEWPRICE anywhere in it, so any number here could
-            // later match a different NEWPRICE: a current price of 13.99
-            // in the note would hide a NEWPRICE of 3.99 from production.
-            WrkCnoTxt = 'REPRICE REVIEW PENDING (IVRRPCGEN) - DO NOT ' +
-                        'REPRINT AT THE CURRENT PRICE UNTIL THE NEW ' +
-                        'PRICE IS SET.';
-
-            Chain (WrkCndItem : WrkCnoRcd) NOTEPADI;
-            If %Found(NOTEPADI);
-               NTE_NOTE1   = WrkCnoTxt;
-               NTE_NOTE2   = *Blanks;
-               NTE_CHGTS   = %Timestamp();
-               NTE_CHGUSER = WrkUser;
-               Update NOTEPAD$;
-            Else;
-               Clear NOTEPAD$;
-               NTE_ITMNUM  = WrkCndItem;
-               NTE_RCDNBR  = WrkCnoRcd;
-               NTE_NOTE1   = WrkCnoTxt;
-               NTE_ADDTS   = %Timestamp();
-               NTE_ADDUSER = WrkUser;
-               Write NOTEPAD$;
-            Endif;
-
-            WrkCnoFl = 'Y';
-            WrkCntCno += 1;
-
-            Exsr Sbr_Write_Audit;
-
-         Endsr;
-      /end-free
-
-      //***********************************************************************
       //* Subroutine: Write the suggestion
       //***********************************************************************
       /free
@@ -1031,8 +927,9 @@
             SUG_RPCLSTCHG = WrkLstChg;
             SUG_RPCDUEDT  = WrkDueDt;
             SUG_RPCJOB7   = WrkCndJob;
-            SUG_RPCCNOFL  = WrkCnoFl;
-            SUG_RPCCNORCD = WrkCnoRcd;
+            SUG_RPCCNOFL  = 'N';
+            SUG_RPCCNORCD = 0;
+            SUG_RPCCNOSET = 'N';
             SUG_RPCGENTS  = %Timestamp();
             SUG_RPCACTTS  = *Loval;
             SUG_RPCEDITR  = *Blanks;
@@ -1049,6 +946,8 @@
             Endif;
 
             Write IV$RPCSUG;
+
+            Exsr Sbr_Write_Audit;
 
          Endsr;
       /end-free
@@ -1080,8 +979,6 @@
             Dsply ('Cycle ' + %Char(WrkCycle) + ' mode ' + WrkMode);
             Dsply ('Candidates read : ' + %Char(WrkCntRead));
             Dsply ('Suggestions     : ' + %Char(WrkCntWrote));
-            Dsply ('CNOs attached   : ' + %Char(WrkCntCno));
-            Dsply ('CNO pad full    : ' + %Char(WrkCntCnoFull));
             Dsply ('Skip no item    : ' + %Char(WrkCntNoItem));
             Dsply ('Skip no control : ' + %Char(WrkCntNoCtl));
             Dsply ('Skip phase 0    : ' + %Char(WrkCntPhase));

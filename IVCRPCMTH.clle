@@ -4,10 +4,11 @@
 /*====================================================================*/
 /* The monthly cycle, in the order the two programs have to run in:    */
 /*                                                                    */
-/*   1. IVRRPCGEN  looks at what is due to re-run, works out a         */
-/*                 suggested price per catalogue and attaches the CNO  */
-/*   2. IVRRPCAPL  applies what editors actioned since the last run,   */
-/*                 auto-applies for phase 2 catalogues, and expires    */
+/*   1. IVRRPCGEN  looks at what is due to re-run and works out a      */
+/*                 suggested price per catalogue                       */
+/*   2. IVRRPCAPL  attaches the correction note (CNO) to each new      */
+/*                 suggestion, stages what editors approved, stages    */
+/*                 phase 2 catalogues automatically, and expires       */
 /*                 anything nobody acted on so that its CNO comes off  */
 /*                                                                    */
 /* Generating first means a title that becomes due this month is in    */

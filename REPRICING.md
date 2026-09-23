@@ -18,9 +18,9 @@ programs match an item to a row and do the arithmetic.
 | `IVPRPCSUG` | PF | One suggestion per item per cycle, with its full audit |
 | `IVPRPCSG1` | LF | Suggestions by catalogue and status — the editor queue and report path |
 | `IVVRPCWRK` | DSPF | Work with Repricing Suggestions |
-| `IVRRPCGEN` | RPGLE | Generates suggestions, attaches the CNO |
+| `IVRRPCGEN` | RPGLE | Generates suggestions |
 | `IVRRPCWRK` | RPGLE | Editor approves, overrides or rejects |
-| `IVRRPCAPL` | RPGLE | Applies decisions, releases CNOs, expires stale suggestions |
+| `IVRRPCAPL` | RPGLE | Attaches, prices and releases CNOs; stages decisions; expires stale suggestions |
 | `IVCRPCMTH` | CL | Monthly run |
 | `IVCRPCBLD` | CL | Creates the objects |
 | `IVPRPC*_seed.sql` | SQL | The published rules, transcribed |
@@ -195,47 +195,61 @@ Two consequences, both handled:
   at the new printing — and until then the generator leaves the title alone,
   because its queue row now carries a `NEWPRICE`. The loop closes by itself.
 
-**The CNO is `NOTEPADI`, not an item code — and it is now wired up.**
-`IVRORRNEWP` reads up to four note records per item and decides a price change
-is already covered when a note contains the word `PRICE` and the new price. Its
-history reads *"Skip printing price change if correction note was added"*.
-`NOTEPADI` is the item's pop-up note pad (record format `NOTEPAD$`: `ITMNUM`,
-`RCDNBR`, `NOTE1` 256, `NOTE2` 186, add/change timestamp and user).
+**The CNO is a correction on `NOTEPADI`, written exactly the way the house
+writes one.** `IVRORRNEWP` treats a price change as covered when a correction
+contains the word `PRICE` and the new price. `IVRICNO` (the pop-up note pad) and
+`IVRCNOUPD` (mass corrections upload) show how a correction is actually stored,
+and it is not one note per record:
 
-The CNO now follows the review through:
+- A `NOTEPADI` record is a **page** (`RCDNBR` 1–4). `NOTE1` + `NOTE2` are 13
+  lines of 34 characters, and one page holds several corrections one after
+  another.
+- A correction is a header line, `Correction MM/YY <name>` (the name from
+  `MFPUSERS`), then body lines of at most 34 characters. It goes in the first
+  gap on the first page with room, after one blank separator line, and nothing
+  already on the page moves.
+- Adding one sets `IVPORRITM.CNO = 'M'` (if blank) and `IVPITEMS.CORRCD = 'C'`.
+- When a removal leaves all four pages empty, `IVRICNO` deletes the four records
+  and clears `CORRCD`.
 
-| Stage | Note on the item |
+This process now follows those rules to the letter:
+
+| Stage | Four lines on the note pad |
 | --- | --- |
-| Suggestion raised | `REPRICE REVIEW PENDING (IVRRPCGEN) - DO NOT REPRINT AT THE CURRENT PRICE UNTIL THE NEW PRICE IS SET.` |
-| Approved and staged | rewritten to `PRICE CHANGE ON RERUN (IVRRPCAPL) - NEW PRICE 13.99` |
-| Rejected, expired, stale, no longer rerun | deleted |
+| Suggestion raised | `Correction  9/26 <name>` / `Price review pending (IVRRPC)` / `Do not reprint at the current` / `price until new price is set.` |
+| Approved and staged | same four lines rewritten: `Correction  9/26 <name>` / `Price change on rerun (IVRRPC)` / `New price 13.99` / `Reprint at the new price.` |
+| Rejected, expired, stale, no longer rerun | the four lines blanked; `IVRICNO`'s empty-pad rule applied |
 
-Because it is the pop-up note pad, anyone who opens the item sees the pending
-note — which is the alert the release asks for. Once approved it becomes the
-note an editor would have typed by hand, in exactly the form `IVRORRNEWP`
-recognises, so the change is not reported twice. After that it stays, like any
-other CNO: it is the instruction for the reprint.
+Guarantees, each simulated against realistic note pads before committing:
 
-Guarantees that matter here:
+- **Editors' corrections are never touched.** The process finds its own block by
+  the `(IVRRPC)` marker — so it is still found if an editor adds lines above it —
+  and changes those four lines only. If an editor removes the marker, the lines
+  are theirs.
+- **The pad is only deleted when it is empty**, and `CORRCD` only cleared then.
+  `IVPORRITM.CNO` is only cleared if this process was the one that set it
+  (`RPCCNOSET`).
+- **`IVRORRNEWP` always recognises the approved correction.** `NOTE1` ends 18
+  characters into line 8 and the report scans `NOTE1` and `NOTE2` separately, so
+  a price on line 8 could be split and missed. Blocks are never placed with the
+  price on line 8.
+- **No number but the new price.** The report matches `%Char(NEWPRICE)` as a
+  substring, so a current price of `13.99` in the pending note would later hide a
+  hand-set `3.99`. The pending lines carry no price at all, and the price is
+  formatted from a field declared `LIKE(ORR_NEWPRICE)`.
+- **No room on any page** — nobody's correction is moved. The suggestion goes
+  ahead without one, and the staged `NEWPRICE` puts the item on the *Items with
+  New Price* report instead.
 
-- **Editors' notes are never touched.** The process uses the first free record
-  of the four `IVRORRNEWP` reads, stores its `RCDNBR` on the suggestion, and only
-  updates or deletes a note that still carries `(IVRRPC`. If an editor rewrites
-  it and the marker goes, it is theirs. If all four records are taken, no note
-  is added — the item still gets its suggestion, and the staged `NEWPRICE` puts
-  it on the *Items with New Price* report instead.
-- **The price is formatted exactly as `IVRORRNEWP` formats it**, from a field
-  declared `LIKE(ORR_NEWPRICE)`, so the scan finds `13.99` and not `13.9900`.
-- **The notes carry no number except the new price.** `IVRORRNEWP` matches
-  `%Char(NEWPRICE)` anywhere in the text, so an old price in the note — `13.99`
-  — would later "cover" a hand-set `NEWPRICE` of `3.99` and hide it from
-  production. Proven against its matching rule before committing.
+All of this lives in one program, `IVRRPCAPL`. The generator raises suggestions
+only; `IVRRPCAPL` attaches the correction to every open suggestion that lacks
+one, which in the monthly job is minutes later. That keeps every write to the
+note pad and its flags in one place.
 
-One weakness remains that this cannot fix, because it is in `IVRORRNEWP` itself:
-its scan matches substrings, so if `NEWPRICE` is later changed by hand from
-`13.99` to `3.99`, the note still "covers" it. That is equally true of every
-hand-typed CNO today. The fix is a one-line change in `IVRORRNEWP` — scan for
-the price with a delimiter in front of it — and is outside this change.
+`IVRORRNEWP`'s substring scan has one weakness this cannot remove: if `NEWPRICE`
+is later changed by hand from `13.99` to `3.99`, the correction still "covers"
+it. That is equally true of every hand-typed correction; the fix belongs in
+`IVRORRNEWP`.
 
 **`RERUNSTS` now has meanings, from the programs that test each value.**
 
@@ -293,10 +307,11 @@ forgotten suggestion would quietly block production. After `RPCEXPCY` cycles the
 suggestion expires and the CNO comes off, which also lets the next run raise the
 title again rather than forget it.
 
-The mechanism is `NOTEPADI` — see *What the online re-run programs settled* for
-the note text at each stage and the guarantees around editors' notes. It lives in
-two subroutines, `Sbr_Attach_CNO` in `IVRRPCGEN` and `Sbr_Release_CNO` /
-`Sbr_Price_CNO` in `IVRRPCAPL`, and is switched by `RPCCNOYN`.
+The mechanism is a correction on `NOTEPADI` in the house format — see *What the
+online re-run programs settled* for the lines written at each stage and the
+guarantees around editors' corrections. It lives entirely in `IVRRPCAPL`
+(`Sbr_Attach_CNO`, `Sbr_Price_CNO`, `Sbr_Release_CNO` and the `Sbr_Cno_*`
+helpers) and is switched by `RPCCNOYN`.
 
 ## Running it
 
@@ -338,16 +353,27 @@ one of them is the place to look. That step must also call `IVRUDRLITM`, below.
 
 Two things to check before a pilot:
 
-- **`IVRORRNWPR` writes `NEWPRICE` in batch.** If it runs routinely it could
-  overwrite a price this process staged — the applier refuses to overwrite a
-  person's `NEWPRICE`, but nothing stops `IVRORRNWPR` overwriting ours. Its
-  source is the one to read next.
+- **`IVRORRNWPR` — read, and no conflict.** It is a 2022 program (*"Auto
+  populate the New Price field in the rerun program for items needing price
+  increases"*): for queue rows with a blank status it copies a price from a
+  staging file, `IVPORRPRCU`, into `NEWPRICE`, after checking `PRICE112` has not
+  changed since the price was staged. It **only writes when `NEWPRICE` is zero**,
+  so it cannot overwrite a price this process staged; and this process will not
+  overwrite one it set. First writer wins, both ways.
+
+  But it means **an earlier version of this idea already exists.** Something may
+  still be loading `IVPORRPRCU` — perhaps the suggested-price spreadsheets the
+  quarterly re-run pages attach — and if so, two sources are proposing prices for
+  the same titles. Worth one query before a pilot:
+  `SELECT COUNT(*) FROM OBJECT/IVPORRPRCU`, and in `IVPORRMNT` the most recent
+  rows with `ACTION = 'New price'` and `MAINTWHO = 'IS'`, which is how
+  `IVRORRNWPR` signs its work.
 - **The search covered `SOURCE/QRPGLESRC` only.** Older RPG III source in
   `QRPGSRC`, or source in another library, was not searched. The
   cross-reference found programs that read the queue and can update the item
-  without mentioning `NEWPRICE` at all — including three CNO programs,
-  `IVRCNOUPD`, `IVRICNO` and `IVVICNO`, which should be read regardless, to
-  confirm `NOTEPADI` is the only place a CNO lives.
+  without mentioning `NEWPRICE` at all. The three CNO programs among them
+  (`IVRCNOUPD`, `IVRICNO`, `IVVICNO`) are now read, and confirm `NOTEPADI` is
+  where corrections live.
 
 **Price changes propagate through `IVRUDRLITM`.** When a hardgood's price
 changes, `IVRUDRLITM(item, price)` gives its related item the same price and
@@ -355,10 +381,15 @@ every eBook the same price, less 20% for an HL digital book, with `IVPMAINT`
 rows marked *"Change made by IVRUDRLITM"*. `IVRMAINT`'s history says eBook
 price updates are *"now done in IVRUDRLITM"*. The direct-to-item path
 (`RPCAPLTGT 'I'`) now calls it; before this it would have left eBooks at the old
-price. Nothing read so far calls it directly, so it is probably reached through
-`IVRUPDTPRC`, or a trigger on `IVPITEMS` — `DSPFD FILE(OBJECT/IVPITEMS)
-TYPE(*TRG)` will say. If it is a trigger, the explicit call only adds a duplicate
-audit row for the related item.
+price. Nothing read so far calls it directly. It is not a trigger: `IVPITEMS` has two,
+`SYNC_IVPITEMS_INS` and `SYNC_IVPITEMS_UPD` (program `STT00303`), and by their
+names they replicate the item master elsewhere rather than reprice eBooks. So
+the explicit call stays. It is probably reached today through `IVRUPDTPRC`,
+which `IVRMAINT` copies in.
+
+Worth knowing about those triggers: every update this process makes to
+`IVPITEMS` — the price in `'I'` mode, and `CORRCD` for a correction — fires
+`SYNC_IVPITEMS_UPD`, the same as any other program's update.
 
 **Unidentified: `DADSYUGI`.** Most recent `IVPMAINT` price rows carry it as
 `MAINTWHO`, and it is neither a program nor a current user. Candidates, with the
@@ -455,8 +486,9 @@ is control data rather than a hard-coded guess, so closing it is a data change.
 `IVRITEMSM4` (`IVPITEMS` maintenance), `IVRPRCUPD` (price upload: MSRP, MAP,
 `HLCOST`, tier pricing), `IVRNOPUPD`, `IVRORRNEWP` (items with new price),
 `IVRORRNBR` (items not to be rerun), `IVRORRIVP2` (min qty online print),
-`IVRORRCLN` (nightly cleanup) and `IVRUDRLITM` (price propagation to related
-items and eBooks). Plus a `FNDSTRPDM` of `NEWPRICE` across `SOURCE/QRPGLESRC`
+`IVRORRCLN` (nightly cleanup), `IVRUDRLITM` (price propagation to related
+items and eBooks), `IVRORRNWPR` (auto-populate new price), `IVRCNOUPD` (mass
+corrections upload), `IVRICNO` and `IVVICNO` (the item note pad). Plus a `FNDSTRPDM` of `NEWPRICE` across `SOURCE/QRPGLESRC`
 and a `DSPPGMREF` cross-reference of programs that read the re-run queue and can
 update the item master.
 
