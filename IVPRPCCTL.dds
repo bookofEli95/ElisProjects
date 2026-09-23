@@ -52,6 +52,8 @@
      A                                      COLHDG('AUTH' 'ACTION')
      A            RPCSTSLST     20A         TEXT('Eligible rerun statuses')
      A                                      COLHDG('RERUN' 'STATUS' 'LIST')
+     A            RPCSTSEXC     20A         TEXT('Excluded rerun statuses')
+     A                                      COLHDG('RERUN' 'STATUS' 'EXCL')
      A            RPCFLDLST     60A         TEXT('IVPMAINT price fld names')
      A                                      COLHDG('PRICE' 'FIELD' 'LIST')
      A            RPCNOCHDT       L         TEXT('Date used if never chgd')

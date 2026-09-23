@@ -111,6 +111,58 @@ So **keep Choral on `RPCMODEL 'P'`**, where the ladder rows cover everything
 under $5. `IVPRPCRUL_seed.sql` ends with a commented-out `UPDATE` that caps the
 Choral bracket rows, for use if Choral is ever put on model `B`.
 
+## What the program listings settled
+
+`IVRMAINT`, `IVRMAINT2`, `IVRITEMSM4`, `IVRPRCUPD` and `IVRNOPUPD` resolved four
+things that had been guesses, and one of them was a live bug.
+
+**A list price change is logged under three different `FLDNAM` values.**
+
+| Program | Writes | When |
+| --- | --- | --- |
+| `IVRMAINT` | `'PRICE '` | list price change (`Sbr_PriceChg`) |
+| `IVRMAINT2` | `'PRICE72'` | the interactive price screen |
+| `IVRPRCUPD` | `'PRICE72'` and `'PRICE112'` | price upload |
+
+`RPCFLDLST` was seeded ` PRICE72 PRICE112 `, which would have missed
+`IVRMAINT` — the main item maintenance program. Every price change made through
+it would have read as "never repriced", putting those titles in the oldest
+bracket at the largest uplift. Now seeded ` PRICE PRICE72 PRICE112 `.
+
+Matching is also case-insensitive now, because the same library writes both
+`'HLCOST'` and `'HLCost'` for one field. `MAPPRICE` and `REFPRICE` are
+deliberately excluded — they are the reference price on `IVPREFPRC`, not the
+list price.
+
+**`PRICE72` and `PRICE112` are one price in two fields.** Both programs that
+change a list price set them from a single number — `IVRMAINT2` from the price an
+editor types, `IVRPRCUPD` from the uploaded MSRP. The generator no longer
+reprices `112` on its own base and the screen no longer scales it
+proportionally; it takes the same number. Anything else would drift the two
+apart.
+
+**`RERUNSTS 'J'` means *not* in the re-run queue.** `IVRMAINT` sets it with a
+blank `Hold` to take an item off the queue, logging action `canceled`, and
+`P1VBTCHUP` writes it for a job created outside the queue. So it is an exclusion,
+not a candidate. New control field `RPCSTSEXC`, seeded `' J '` — which matters
+precisely because the inclusion list is still blank.
+
+**Approving a suggestion now requires price authority.** `IVRMAINT2` gates price
+changes behind `CHECKSEC( SdsProgram : 'PRICE72' : ... )`. `IVRRPCWRK` was a way
+round that check; it now makes the same call and runs read-only without it.
+
+**And a bug of my own.** All three programs declared their own program status
+structure as `D SdsUser SDS`, which names the *whole* structure — so
+`WrkUser = SdsUser` took positions 1-10, the program name, and would have written
+that into `MAINTWHO` and `RPCEDITR` instead of the user. Every program in the
+library uses `/copy qcopysrc,statusds`, which supplies a properly named `SdsUser`
+and `SdsProgram`. All three now do the same.
+
+Two smaller conventions adopted: `MNT_COMMENT` carries the program name
+(`'IVRRPCAPL'`), as `IVRPRCUPD` and `IVRITEMSM4` do; and the item update is
+`Update IVPITEM$ %Fields(ITM_PRICE72 : ITM_PRICE112)` rather than a full-record
+write, so it cannot undo another job's change to an unrelated field.
+
 ## Guardrails
 
 - **Eligibility.** A title repriced within `RPCELGMO` months is left alone.
@@ -174,19 +226,21 @@ is control data rather than a hard-coded guess, so closing it is a data change.
    Education and no Self-Teach. If they are one group, map those `DIVCAT`s
    accordingly; if not, one bracket set and one percentage set are missing.
    Seeded faithfully, so model `B` has no `EDU` rows and model `P` no `SFT` rows.
-4. **`RERUNSTS` values.** `RPCSTSLST` is blank, which means no status filter —
-   wider than the internal approval queue the Redash report shows. The only
-   value visible in existing code is `'J'` (PCR-created job, explicitly *not* an
-   online re-run). Blocks phase 1.
-5. **`IVPMAINT.FLDNAM` for a price change.** `RPCFLDLST` is seeded
-   ` PRICE72 PRICE112 ` on the reasoning that field-level audit rows carry the
-   field's own name, which is how `'ADDED'` behaves in `P1VBTCHUP`. `IVRRPCAPL`
-   writes those same names, so the loop is self-consistent — but if the
-   interactive price-maintenance program writes something else, its value has to
-   be added or history will read as "never repriced".
+4. **`RERUNSTS` values — half settled.** `'J'` is confirmed as *not in the
+   queue* and is now excluded via `RPCSTSEXC`. The **inclusion** list is still
+   unknown: `RPCSTSLST` is blank, so the candidate set remains wider than the
+   internal approval queue the Redash report shows. Blocks phase 1.
+5. ~~**`IVPMAINT.FLDNAM` for a price change.**~~ **Settled** — three spellings,
+   all three now seeded. See *What the program listings settled*.
 6. **`IVPMAINT` retention.** If rows are purged, a title repriced long ago is
    indistinguishable from one never repriced, and both land on the oldest
    bracket — the largest uplift. Confirm retention before phase 2.
+
+   There may be a better source than `MAX()` over history: **`IVPMAINTDT`** is
+   keyed on `(ITMNUM, FLDNAM)` and holds a single `MAINTDT`. `IVRMAINT` appears
+   to write it only for `MINQTYUSG`, so it is no use as it stands — but if any
+   program populates it for the price fields, a keyed read would replace the
+   aggregate and be immune to history being purged. Worth one look.
 7. **Pricing-authority field.** Which AS400 field marks a title we are not free
    to reprice (`PBLSHRNUM`? `RORefNum`? `CNTRTP`?). The evaluating document flags
    this twice: *"question marks over our ability to raise prices under third
@@ -198,9 +252,9 @@ is control data rather than a hard-coded guess, so closing it is a data change.
 9. **Do brackets snap to `.99`?** The brackets document says nothing, so bracket
    rows are seeded `RULROUND 'NONE'` and produce prices like `$61.00` from a
    `$45.00` base. The percentage model snaps, because its source says to.
-10. **`PRICE72` vs `PRICE112`.** Both move together by the same proportion when
-    `RPCP112YN` is `'Y'`. Confirm that is right, and what should happen to score
-    and part items within an Instrumental set.
+10. ~~**`PRICE72` vs `PRICE112`.**~~ **Settled** — one price in two fields, set
+    from the same number. Still open: what should happen to score and part items
+    within an Instrumental set, which the sources price as a set.
 11. **Re-run due date.** Taken as the earlier of `IVPORRITM.MINQTYDT` and the
     `RERUN8` planned finish date. The documents define due as *"stock depletes to
     reorder floor within 6 months at 2025 sell rate"* — if that forecast exists
@@ -209,6 +263,22 @@ is control data rather than a hard-coded guess, so closing it is a data change.
 12. **Kill-candidate disposition.** `RULDISP` carries the published disposition
     (`KILLCAND` / `WATCH` / `CULLREV`) on to each suggestion, but nothing acts on
     it yet and "dead" is undefined.
+13. **`RERUNA` and `IVPRERUN`.** `IVPITEMS.RERUNA` is a re-run action code
+    validated against `IVPRERUN`, and `IVRMAINT` shows `'9'` means substitution —
+    it requires a substitution item number. A title being substituted rather than
+    re-run probably should not be repriced, but the rest of that code table is
+    not visible here, so nothing is excluded on it yet. Send `IVPRERUN`'s
+    contents and this becomes another control-data exclusion.
+14. **Authority on the batch apply.** `IVRRPCWRK` now calls `CHECKSEC` for
+    `'PRICE72'`, matching `IVRMAINT2`. `IVRRPCAPL` runs as a batch job user and
+    does not. For phase 2 — where it applies prices with no editor involved —
+    decide whether that job user should have to hold the same authority.
+
+## Programs read
+
+`IVRMAINT` (inventory maintenance), `IVRMAINT2` (interactive price change),
+`IVRITEMSM4` (`IVPITEMS` maintenance), `IVRPRCUPD` (price upload: MSRP, MAP,
+`HLCOST`, tier pricing) and `IVRNOPUPD`.
 
 ## Source documents
 

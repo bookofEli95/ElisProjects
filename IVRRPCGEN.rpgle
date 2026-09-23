@@ -64,8 +64,12 @@
       //**********************************************************************
       // Data Structures & Variables
       //**********************************************************************
-     D SdsUser         SDS
-     D                       254    263A
+      // The shared program status data structure, which is where every
+      // other program in this library gets SdsUser and SdsProgram from.
+      // Declaring one here by hand is how you end up writing the program
+      // name into MAINTWHO: naming the structure SdsUser makes the name
+      // resolve to positions 1-10, not the user profile at 254-263.
+      /copy qcopysrc,statusds
 
       // Entry parameters
      D PrmCycle        S              6A
@@ -110,6 +114,8 @@
       // Selection settings taken from the default control row
      D WrkStsChk       S              1A   Inz('N')
      D WrkStsPad       S             22A   Inz(*Blanks)
+     D WrkExcChk       S              1A   Inz('N')
+     D WrkExcPad       S             22A   Inz(*Blanks)
      D WrkFldPad       S             62A   Inz(*Blanks)
      D WrkHoriz8       S              8S 0 Inz(0)
      D WrkFrom8        S              8S 0 Inz(0)
@@ -218,6 +224,9 @@
                            AND ( :WrkStsChk = 'N'
                               OR LOCATE(' ' CONCAT TRIM(O.RERUNSTS)
                                             CONCAT ' ', :WrkStsPad) > 0 )
+                           AND ( :WrkExcChk = 'N'
+                              OR LOCATE(' ' CONCAT TRIM(O.RERUNSTS)
+                                            CONCAT ' ', :WrkExcPad) = 0 )
                         UNION ALL
                         SELECT R.ITEM# AS ITMNUM,
                                R.FINISHYYYY * 10000
@@ -331,6 +340,18 @@
 
             // IVPMAINT field names that count as a price change, padded
             // so they can be matched as whole tokens.
+            // Statuses that mean the item is not in the online re-run
+            // queue at all. RERUNSTS 'J' is one: IVRMAINT sets it, with
+            // a blank Hold, to take an item off the queue. Excluding it
+            // matters most while the inclusion list is still blank.
+            If %Trim(CTL_RPCSTSEXC) = *Blanks;
+               WrkExcChk = 'N';
+               WrkExcPad = *Blanks;
+            Else;
+               WrkExcChk = 'Y';
+               WrkExcPad = ' ' + %Trim(CTL_RPCSTSEXC) + ' ';
+            Endif;
+
             WrkFldPad = ' ' + %Trim(CTL_RPCFLDLST) + ' ';
 
             // Candidate window. The widest horizon of any catalogue would
@@ -554,14 +575,16 @@
                Leavesr;
             Endif;
 
-            // The second price list moves on the same rule when the
-            // control row says the two move together.
+            // PRICE112 is not a second price to work out - it is the
+            // same price in a second field. Both programs that change a
+            // list price set them together from one number: IVRMAINT2
+            // does Itm_PRICE72 = Itm_PRICE112 = the entered price, and
+            // IVRPRCUPD does the same from the uploaded MSRP. The
+            // suggestion follows that rather than repricing 112 on its
+            // own, which would drift the two apart.
             WrkSug112 = 0;
-            If CTL_RPCP112YN = 'Y' And ITM_PRICE112 > 0;
-               WrkBasePrc = ITM_PRICE112;
-               Exsr Sbr_Compute_Price;
-               WrkSug112  = WrkNewPrc;
-               WrkBasePrc = ITM_PRICE72;
+            If CTL_RPCP112YN = 'Y';
+               WrkSug112 = WrkSug72;
             Endif;
 
             // 12. A report-only run stops here having written nothing
@@ -592,6 +615,18 @@
             // Which FLDNAM values count as a price change is control
             // data, matched as whole tokens so that PRICE72 cannot match
             // inside PRICE112 by accident.
+            //
+            // Three spellings are in use for one event, so all three
+            // have to be in RPCFLDLST:
+            //   IVRMAINT   writes 'PRICE '  on a list price change
+            //   IVRMAINT2  writes 'PRICE72'
+            //   IVRPRCUPD  writes 'PRICE72' and 'PRICE112'
+            // Matching is case-insensitive because the same library
+            // writes both 'HLCOST' and 'HLCost' for one field.
+            //
+            // MAPPRICE and REFPRICE are deliberately not in that list:
+            // they are the reference price on IVPREFPRC, not the list
+            // price, so changing one does not reset this clock.
             WrkLstChg8 = 0;
             Exec SQL
                SELECT COALESCE(MAX(MAINTYYYY * 10000
@@ -603,8 +638,8 @@
                   AND MAINTYYYY >= 1900
                   AND MAINTMM BETWEEN 1 AND 12
                   AND MAINTDD BETWEEN 1 AND 31
-                  AND LOCATE(' ' CONCAT TRIM(FLDNAM) CONCAT ' ',
-                             :WrkFldPad) > 0;
+                  AND LOCATE(' ' CONCAT UPPER(TRIM(FLDNAM)) CONCAT ' ',
+                             UPPER(:WrkFldPad)) > 0;
 
             // No audit row means the item has either never been repriced
             // or was repriced before the retention IVPMAINT keeps. Both

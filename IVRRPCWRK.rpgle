@@ -66,13 +66,20 @@
       //**********************************************************************
       // Data Structures & Variables
       //**********************************************************************
-     D SdsUser         SDS
-     D                       254    263A
+      // The shared program status data structure and the security check,
+      // both taken from the copybooks the rest of the library uses.
+      // SdsUser and SdsProgram come from statusds; a hand-rolled
+      // structure named SdsUser would resolve to positions 1-10, the
+      // program name, not the user profile at 254-263.
+      /copy qcopysrc,statusds
+      /copy qcopysrc,checksec
 
      D WrkRrn          S              4S 0 Inz(0)
      D WrkLoaded       S              5S 0 Inz(0)
      D WrkExit         S              1A   Inz('N')
      D WrkUser         S             10A   Inz(*Blanks)
+     D WrkAuth         S              1A   Inz('N')
+     D PrmAuth         S              1A   Inz(*Blanks)
      D WrkToday        S               D
 
       // One row of the queue, fetched for the subfile
@@ -82,7 +89,6 @@
       // Decision being recorded
      D WrkNew72        S              9S 2 Inz(0)
      D WrkNew112       S              9S 2 Inz(0)
-     D WrkRatio        S             13S 6 Inz(0)
      D WrkCapVal       S             13S 4 Inz(0)
      D WrkCapPct       S              5S 2 Inz(0)
      D WrkBreach       S              1A   Inz('N')
@@ -135,6 +141,24 @@
             WDIVCAT = 0;
             WSTAT   = *Blanks;
             WMSG    = *Blanks;
+
+            // Approving a suggestion is agreeing to a price change, so it
+            // is held to the same authority as typing one into IVRMAINT2,
+            // which gates on CHECKSEC for 'PRICE72'. Without this the
+            // screen would be a way round that check.
+            //
+            // Someone without it can still look: the queue is a useful
+            // thing to read, and refusing entry outright would only send
+            // them to ask for numbers by email.
+            PrmAuth = *Blanks;
+            Callp CHECKSEC( SdsProgram : 'PRICE72' : ' '
+                          : SdsUser : PrmAuth );
+            WrkAuth = PrmAuth;
+
+            If WrkAuth <> 'Y';
+               WMSG = 'Read only: you are not authorised to change ' +
+                      'prices (PRICE72).';
+            Endif;
 
          Endsr;
       /end-free
@@ -260,6 +284,11 @@
       /free
          Begsr Sbr_Action_Line;
 
+            If WrkAuth <> 'Y';
+               WMSG = 'Not authorised to change prices (PRICE72).';
+               Leavesr;
+            Endif;
+
             // Keyed off the line's own hidden cycle, not off whatever
             // the record buffer happens to hold from the last read.
             Chain (SITEM : SCYCL) IVPRPCSUG;
@@ -357,13 +386,10 @@
                Endif;
             Endif;
 
-            // Keep the two price lists in step: the second list moves by
-            // the same proportion the editor moved the first.
-            WrkNew112 = 0;
-            If SUG_RPCCUR112 > 0 And SUG_RPCCUR72 > 0;
-               Eval(H) WrkRatio  = WrkNew72 / SUG_RPCCUR72;
-               Eval(H) WrkNew112 = SUG_RPCCUR112 * WrkRatio;
-            Endif;
+            // PRICE112 takes the same number rather than a scaled one:
+            // IVRMAINT2 sets both fields from the single price an editor
+            // types, so they are one price in two fields.
+            WrkNew112 = WrkNew72;
 
             SUG_RPCSTAT   = 'O';
             SUG_RPCAPP72  = WrkNew72;

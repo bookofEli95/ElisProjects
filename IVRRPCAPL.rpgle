@@ -74,8 +74,11 @@
       //**********************************************************************
       // Data Structures & Variables
       //**********************************************************************
-     D SdsUser         SDS
-     D                       254    263A
+      // The shared program status data structure - SdsUser and
+      // SdsProgram come from here, as in every other program in this
+      // library. A hand-rolled structure named SdsUser resolves to
+      // positions 1-10, the program name, not the user profile.
+      /copy qcopysrc,statusds
 
       // Entry parameters
      D PrmMode         S              1A
@@ -95,7 +98,6 @@
 
       // Working values
      D WrkNew72        S              9S 2 Inz(0)
-     D WrkNew112       S              9S 2 Inz(0)
      D WrkOld72        S              9S 2 Inz(0)
      D WrkOld112       S              9S 2 Inz(0)
      D WrkCapVal       S             13S 4 Inz(0)
@@ -232,7 +234,6 @@
             WrkBreach = 'N';
             WrkNote   = *Blanks;
             WrkNew72  = 0;
-            WrkNew112 = 0;
 
             // Read for update. The cursor gave a key rather than the row
             // so the record is locked here and nowhere else.
@@ -258,16 +259,13 @@
             When SUG_RPCSTAT = 'A';
                WrkAction = 'A';
                WrkNew72  = SUG_RPCSUG72;
-               WrkNew112 = SUG_RPCSUG112;
             When SUG_RPCSTAT = 'O';
                WrkAction = 'O';
                WrkNew72  = SUG_RPCAPP72;
-               WrkNew112 = SUG_RPCAPP112;
             When SUG_RPCSTAT = 'S' And WrkMode = 'M'
                                    And CTL_RPCPHASE = '2';
                WrkAction = 'U';
                WrkNew72  = SUG_RPCSUG72;
-               WrkNew112 = SUG_RPCSUG112;
             When SUG_RPCSTAT = 'R';
                WrkAction = 'C';
             Other;
@@ -397,14 +395,19 @@
 
             ITM_PRICE72 = WrkNew72;
 
-            // The second list only moves when the control row says the
-            // two move together and the suggestion carried a figure for
-            // it. Otherwise it is left exactly as it was.
-            If CTL_RPCP112YN = 'Y' And WrkNew112 > 0;
-               ITM_PRICE112 = WrkNew112;
+            // PRICE112 takes the same number, not a separately worked
+            // out one. IVRMAINT2 sets Itm_PRICE72 and Itm_PRICE112 from
+            // the one price an editor types, and IVRPRCUPD does the same
+            // from the uploaded MSRP, so they are one price in two
+            // fields and must not be allowed to drift apart here.
+            If CTL_RPCP112YN = 'Y';
+               ITM_PRICE112 = WrkNew72;
             Endif;
 
-            Update IVPITEM$;
+            // Only the price fields are written back, the way IVRMAINT2
+            // and IVRPRCUPD do it, so a full-record update cannot undo
+            // another job's change to an unrelated field.
+            Update IVPITEM$ %Fields(ITM_PRICE72 : ITM_PRICE112);
 
             // One audit row per field that actually moved.
             WrkFld    = 'PRICE72';
@@ -560,9 +563,15 @@
       /free
          Begsr Sbr_Write_Maint;
 
-            // FLDNAM has to be one of the names IVRRPCGEN looks for when
-            // it works out when a title was last repriced (RPCFLDLST),
-            // or this process cannot see its own history.
+            // FLDNAM has to be one of the names IVRRPCGEN looks for
+            // when it works out when a title was last repriced
+            // (RPCFLDLST), or this process cannot see its own history.
+            // 'PRICE72' and 'PRICE112' are what IVRPRCUPD writes for the
+            // same change, so these rows read the same as an upload's.
+            //
+            // COMMENT carries the program name, which is how IVRPRCUPD
+            // and IVRITEMSM4 make an audit row traceable to what wrote
+            // it.
             Clear IVPMAIN$;
             MNT_ITMNUM    = WrkSugItem;
             MNT_FLDNAM    = WrkFld;
@@ -573,7 +582,7 @@
             MNT_BEFORE    = WrkBefore;
             MNT_AFTER     = WrkAfter;
             MNT_REPCODE   = 'N';
-            MNT_COMMENT   = *Blanks;
+            MNT_COMMENT   = 'IVRRPCAPL';
             Write IVPMAIN$;
 
          Endsr;
