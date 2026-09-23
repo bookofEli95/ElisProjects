@@ -6,17 +6,26 @@
 /* physical files first, then the logical over the suggestion file,    */
 /* then the display file, then the programs that reference them.       */
 /*                                                                    */
-/* Assumes the usual source members:                                   */
-/*   DDS   ->  OBJECT/QDDSSRC                                          */
-/*   RPG   ->  OBJECT/QRPGLESRC                                        */
-/*   CL    ->  OBJECT/QCLSRC                                           */
+/* Source is read from library SOURCE, where every existing program's */
+/* source lives (SOURCE/QRPGLESRC in each listing):                     */
+/*   DDS   ->  SOURCE/QDDSSRC                                          */
+/*   RPG   ->  SOURCE/QRPGLESRC                                        */
+/*   CL    ->  SOURCE/QCLSRC                                           */
+/* SOURCE must be on the library list, so that the /copy members       */
+/* (QCOPYSRC: statusds, checksec, ivrudrlitm) resolve.                 */
+/*                                                                    */
+/* Objects are created in OBJECT, and the programs name their files    */
+/* EXTFILE('OBJECT/...') the way P1VBTCHUP does. Build and test on a   */
+/* development copy first: a phase 0 control row keeps the programs    */
+/* inert, but a build here replaces nothing only because none of these */
+/* objects exist yet.                                                  */
 /*                                                                    */
 /* The three seed scripts are run afterwards, not from here, because   */
 /* seeding is a data decision and this is an object build:             */
 /*                                                                    */
-/*   RUNSQLSTM SRCFILE(OBJECT/QSQLSRC) SRCMBR(IVPRPCCTLS)              */
-/*   RUNSQLSTM SRCFILE(OBJECT/QSQLSRC) SRCMBR(IVPRPCRULS)              */
-/*   RUNSQLSTM SRCFILE(OBJECT/QSQLSRC) SRCMBR(IVPRPCLADS)              */
+/*   RUNSQLSTM SRCFILE(SOURCE/QSQLSRC) SRCMBR(IVPRPCCTLS)              */
+/*   RUNSQLSTM SRCFILE(SOURCE/QSQLSRC) SRCMBR(IVPRPCRULS)              */
+/*   RUNSQLSTM SRCFILE(SOURCE/QSQLSRC) SRCMBR(IVPRPCLADS)              */
 /*                                                                    */
 /* Every catalogue stays at phase 0 until a control row says otherwise,*/
 /* so building and seeding on their own change no prices.              */
@@ -24,45 +33,45 @@
              PGM
 
              /* ---- files ------------------------------------------- */
-             CRTPF      FILE(OBJECT/IVPRPCCTL) SRCFILE(OBJECT/QDDSSRC) +
+             CRTPF      FILE(OBJECT/IVPRPCCTL) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCCTL) +
                           TEXT('Re-run repricing control')
-             CRTPF      FILE(OBJECT/IVPRPCRUL) SRCFILE(OBJECT/QDDSSRC) +
+             CRTPF      FILE(OBJECT/IVPRPCRUL) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCRUL) +
                           TEXT('Re-run repricing rules')
-             CRTPF      FILE(OBJECT/IVPRPCLAD) SRCFILE(OBJECT/QDDSSRC) +
+             CRTPF      FILE(OBJECT/IVPRPCLAD) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCLAD) +
                           TEXT('Re-run repricing price ladder')
-             CRTPF      FILE(OBJECT/IVPRPCSUG) SRCFILE(OBJECT/QDDSSRC) +
+             CRTPF      FILE(OBJECT/IVPRPCSUG) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCSUG) +
                           TEXT('Re-run repricing suggestions')
-             CRTLF      FILE(OBJECT/IVPRPCSG1) SRCFILE(OBJECT/QDDSSRC) +
+             CRTLF      FILE(OBJECT/IVPRPCSG1) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCSG1) +
                           TEXT('Repricing suggestions by catalogue')
 
              /* ---- display file ----------------------------------- */
-             CRTDSPF    FILE(OBJECT/IVVRPCWRK) SRCFILE(OBJECT/QDDSSRC) +
+             CRTDSPF    FILE(OBJECT/IVVRPCWRK) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVVRPCWRK) +
                           TEXT('Work with repricing suggestions')
 
              /* ---- programs --------------------------------------- */
              /* All three use embedded SQL, so they go through the     */
              /* SQL precompiler rather than CRTBNDRPG.                 */
-             CRTSQLRPGI OBJ(OBJECT/IVRRPCGEN) SRCFILE(OBJECT/QRPGLESRC) +
+             CRTSQLRPGI OBJ(OBJECT/IVRRPCGEN) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCGEN) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
                           TEXT('Generate repricing suggestions')
-             CRTSQLRPGI OBJ(OBJECT/IVRRPCAPL) SRCFILE(OBJECT/QRPGLESRC) +
+             CRTSQLRPGI OBJ(OBJECT/IVRRPCAPL) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCAPL) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
                           TEXT('Apply and expire repricing suggestions')
-             CRTSQLRPGI OBJ(OBJECT/IVRRPCWRK) SRCFILE(OBJECT/QRPGLESRC) +
+             CRTSQLRPGI OBJ(OBJECT/IVRRPCWRK) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCWRK) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
                           TEXT('Work with repricing suggestions')
 
              /* ---- monthly driver -------------------------------- */
-             CRTBNDCL   PGM(OBJECT/IVCRPCMTH) SRCFILE(OBJECT/QCLSRC) +
+             CRTBNDCL   PGM(OBJECT/IVCRPCMTH) SRCFILE(SOURCE/QCLSRC) +
                           SRCMBR(IVCRPCMTH) +
                           TEXT('Re-run repricing monthly run')
 
