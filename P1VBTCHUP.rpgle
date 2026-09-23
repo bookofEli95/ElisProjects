@@ -86,16 +86,6 @@
      D  PrmDivcat                     7A
      D  PrmBillItm                    8A
 
-      // Unicode-aware case conversion (via embedded SQL UPPER/LOWER)
-      // for title/description/author text now that those fields are
-      // CCSID 1208. %XLATE is a raw byte-substitution table and is
-      // not safe for multi-byte UTF-8 content.
-     D UpperUtf8       PR            80A   Varying CCSID(1208)
-     D  PrmUpperIn                   80A   Varying Const CCSID(1208)
-
-     D LowerUtf8       PR            80A   Varying CCSID(1208)
-     D  PrmLowerIn                   80A   Varying Const CCSID(1208)
-
       /copy qcopysrc,upc#2
       /copy qcopysrc,pcrisbn
       /copy qcopysrc,ivraskwd
@@ -141,30 +131,21 @@
      D WrkDate         S               D
      D WrkMktCoord     S             10A    Inz(*Blanks)
 
-     D WrkAuthor       S             12A    CCSID(1208) Inz(*Blanks)
-     D WrkAuthOrig     S             80A    CCSID(1208) Inz(*Blanks)
-     D WrkAuthNorm     S             80A    CCSID(1208) Inz(*Blanks)
-     D WrkAuthSurname  S             40A    CCSID(1208) Inz(*Blanks)
-     D WrkAuthFirst    S             40A    CCSID(1208) Inz(*Blanks)
-     D WrkAuthCand     S             12A    CCSID(1208) Inz(*Blanks)
+     D WrkAuthor       S             12A    Inz(*Blanks)
+     D WrkAuthOrig     S             80A    Inz(*Blanks)
+     D WrkAuthNorm     S             80A    Inz(*Blanks)
+     D WrkAuthSurname  S             40A    Inz(*Blanks)
+     D WrkAuthFirst    S             40A    Inz(*Blanks)
+     D WrkAuthCand     S             12A    Inz(*Blanks)
      D WrkAuthPos      S              5S 0 Inz(0)
      D WrkAuthScanFrom S              5S 0 Inz(0)
-     D WrkAuthWordsOrg S             40A    CCSID(1208) Dim(10) Inz(*Blanks)
+     D WrkAuthWordsOrg S             40A    Dim(10) Inz(*Blanks)
      D WrkAuthWordCnt  S              5S 0 Inz(0)
      D WrkAuthSurnStart S             5S 0 Inz(0)
      D WrkAuthIdx      S              5S 0 Inz(0)
-     D WrkAuthInit     S             20A    CCSID(1208) Inz(*Blanks)
-     D WrkAuthWord     S             40A    CCSID(1208) Inz(*Blanks)
-     D WrkAuthAddVal   S             12A    CCSID(1208) Inz(*Blanks)
-
-      // UTF-8-safe split of the title into LDesc1/2/3 (Step 5) -
-      // see the comment there for why this can't be a plain 29/29/29
-      // byte slice anymore.
-     D WrkTitleSeg1Len  S              3S 0 Inz(0)
-     D WrkTitleSeg2Len  S              3S 0 Inz(0)
-     D WrkTitleSeg2Start S             3S 0 Inz(0)
-     D WrkTitleSeg3Start S             3S 0 Inz(0)
-     D WrkRawByte       S              1A    CCSID(*HEX)
+     D WrkAuthInit     S             20A    Inz(*Blanks)
+     D WrkAuthWord     S             40A    Inz(*Blanks)
+     D WrkAuthAddVal   S             12A    Inz(*Blanks)
 
      D WrkTmppr2       S              7S 4 Inz(0)
      D WrkTmpacm       S              9S 4 Inz(0)
@@ -204,8 +185,8 @@
             //     mixed-case text to detect lower-case surname
             //     particles (van, der, von, de...). Upper-casing
             //     first would erase the signal it depends on.
-            STG_TITLE = UpperUtf8(STG_TITLE);
-            STG_SDESC = UpperUtf8(STG_SDESC);
+            STG_TITLE = %Xlate(WrkLow:WrkUp:STG_TITLE);
+            STG_SDESC = %Xlate(WrkLow:WrkUp:STG_SDESC);
 
             // 0b. Skip rows already uploaded previously - matched on
             //     PUBCODE, which is unique per title in PCPMAIN. This
@@ -292,33 +273,9 @@
             @Itm        = WrkNewItm;
             Jobnum7     = WrkNewJob;
             Divcat      = WrkDivcat;
-
-            // UTF-8-safe split of the 87-byte title into the three
-            // 29-byte LDesc1/2/3 fields. A straight 29/29/29 byte
-            // cut can land in the middle of a 2-byte UTF-8 character
-            // (e.g. ø, å) - back the boundary off by one byte
-            // whenever that would happen, rather than tearing the
-            // character in half. WrkRawByte is CCSID(*HEX) so the
-            // byte is checked as raw binary, not reinterpreted
-            // through the job's CCSID.
-            WrkTitleSeg1Len = 29;
-            WrkRawByte = %Subst(STG_TITLE : 30 : 1);
-            If WrkRawByte >= X'80' And WrkRawByte <= X'BF';
-               WrkTitleSeg1Len = 28;
-            Endif;
-            WrkTitleSeg2Start = 1 + WrkTitleSeg1Len;
-            WrkTitleSeg2Len = 29;
-            If WrkTitleSeg2Start + WrkTitleSeg2Len <= 87;
-               WrkRawByte = %Subst(STG_TITLE : WrkTitleSeg2Start + WrkTitleSeg2Len : 1);
-               If WrkRawByte >= X'80' And WrkRawByte <= X'BF';
-                  WrkTitleSeg2Len = 28;
-               Endif;
-            Endif;
-            WrkTitleSeg3Start = WrkTitleSeg2Start + WrkTitleSeg2Len;
-
-            LDesc1      = %Subst(STG_TITLE : 1 : WrkTitleSeg1Len);
-            LDesc2      = %Subst(STG_TITLE : WrkTitleSeg2Start : WrkTitleSeg2Len);
-            LDesc3      = %Subst(STG_TITLE : WrkTitleSeg3Start);
+            LDesc1      = %Subst(STG_TITLE : 1 : 29);
+            LDesc2      = %Subst(STG_TITLE : 30 : 29);
+            LDesc3      = %Subst(STG_TITLE : 59 : 29);
             Sdesc       = STG_SDESC;
             Price72     = STG_PRICE;
             Price112    = STG_PRICE;
@@ -796,7 +753,7 @@
             Endif;
 
             WrkAuthOrig = %Trim(STG_AUTHOR);
-            WrkAuthNorm = UpperUtf8(WrkAuthOrig);
+            WrkAuthNorm = %Xlate(WrkLow:WrkUp:WrkAuthOrig);
 
             // Split into surname / first-name portions. A comma means
             // "SURNAME, FIRSTNAME" - unambiguous, use as-is. Otherwise
@@ -831,14 +788,14 @@
                Enddo;
 
                If WrkAuthWordCnt <= 1;
-                  WrkAuthSurname = UpperUtf8(%TrimR(WrkAuthWordsOrg(1)));
+                  WrkAuthSurname = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(1)));
                   WrkAuthFirst   = *Blanks;
                Else;
                   WrkAuthSurnStart = WrkAuthWordCnt;
                   Dow WrkAuthSurnStart > 1;
                      WrkAuthWord = %TrimR(WrkAuthWordsOrg(WrkAuthSurnStart - 1));
                      If WrkAuthWord <> *Blanks And
-                        LowerUtf8(WrkAuthWord) = WrkAuthWord;
+                        %Xlate(WrkUp:WrkLow:WrkAuthWord) = WrkAuthWord;
                         WrkAuthSurnStart -= 1;
                      Else;
                         Leave;
@@ -848,20 +805,20 @@
                   WrkAuthSurname = *Blanks;
                   For WrkAuthIdx = WrkAuthSurnStart To WrkAuthWordCnt;
                      If WrkAuthSurname = *Blanks;
-                        WrkAuthSurname = UpperUtf8(%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                        WrkAuthSurname = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
                      Else;
                         WrkAuthSurname = %TrimR(WrkAuthSurname) + ' ' +
-                                         UpperUtf8(%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                                         %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
                      Endif;
                   Endfor;
 
                   WrkAuthFirst = *Blanks;
                   For WrkAuthIdx = 1 To WrkAuthSurnStart - 1;
                      If WrkAuthFirst = *Blanks;
-                        WrkAuthFirst = UpperUtf8(%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                        WrkAuthFirst = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
                      Else;
                         WrkAuthFirst = %TrimR(WrkAuthFirst) + ' ' +
-                                       UpperUtf8(%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                                       %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
                      Endif;
                   Endfor;
                Endif;
@@ -938,33 +895,3 @@
 
          Endsr;
       /end-free
-
-      //***********************************************************************
-      //* Procedures: Unicode-aware upper/lower case via embedded SQL.
-      //* %XLATE is a raw byte-substitution table and isn't safe for
-      //* multi-byte UTF-8 content (CCSID 1208) - SQL's UPPER/LOWER
-      //* do real Unicode case folding instead.
-      //***********************************************************************
-     P UpperUtf8       B
-     D UpperUtf8       PI            80A   Varying CCSID(1208)
-     D  PrmUpperIn                   80A   Varying Const CCSID(1208)
-     D WrkUpperOut     S             80A   Varying CCSID(1208)
-      /free
-         WrkUpperOut = PrmUpperIn;
-         Exec SQL
-            SET :WrkUpperOut = Upper(:WrkUpperOut);
-         Return WrkUpperOut;
-      /end-free
-     P UpperUtf8       E
-
-     P LowerUtf8       B
-     D LowerUtf8       PI            80A   Varying CCSID(1208)
-     D  PrmLowerIn                   80A   Varying Const CCSID(1208)
-     D WrkLowerOut     S             80A   Varying CCSID(1208)
-      /free
-         WrkLowerOut = PrmLowerIn;
-         Exec SQL
-            SET :WrkLowerOut = Lower(:WrkLowerOut);
-         Return WrkLowerOut;
-      /end-free
-     P LowerUtf8       E
