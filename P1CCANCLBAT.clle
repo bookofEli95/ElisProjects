@@ -1,0 +1,27 @@
+             PGM
+
+             /**************************************************/
+             /* P1CCANCLBAT                                     */
+             /* PCR: Batch Close/Cancel PCRs - CL driver         */
+             /* Loads a CSV of Item#/Job# pairs into PCRCANSTG,  */
+             /* then runs P1VCANCLBAT to close each one via the  */
+             /* same P1VCANCL worker the F8 screen uses.          */
+             /* Review PCRCANRSLT afterward for the outcome of   */
+             /* every row (CLOSED / SKIPPED / ERROR).             */
+             /**************************************************/
+
+             DCL        VAR(&IFSFILE) TYPE(*CHAR) LEN(100) +
+                          VALUE('/home/ELIASI/pcrclose.csv')
+
+             CLRPFM     FILE(OBJECT/PCRCANSTG)
+             CLRPFM     FILE(OBJECT/PCRCANRSLT)
+
+             CPYFRMIMPF FROMSTMF(&IFSFILE) TOFILE(OBJECT/PCRCANSTG) +
+                          MBROPT(*REPLACE) FROMCCSID(1208) TOCCSID(*FILE) +
+                          RCDDLM(*CRLF) DTAFMT(*DLM) STRDLM('"') +
+                          FLDDLM(',') FROMRCD(2) ERRLVL(*NOMAX) +
+                          RPLNULLVAL(*FLDDFT) RMVBLANK(*BOTH)
+
+             CALL       PGM(OBJECT/P1VCANCLBAT)
+
+             ENDPGM
