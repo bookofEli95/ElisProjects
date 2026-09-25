@@ -57,10 +57,6 @@
      D WrkItmnum       S                   Like(Mn8_@Itm)
      D WrkJobnum7      S                   Like(Mn8_Jobnum7)
      D WrkCount        S              5S 0 Inz(0)
-     D WrkTotal        S              7S 0 Inz(0)
-     D WrkClosed       S              7S 0 Inz(0)
-     D WrkSkipped      S              7S 0 Inz(0)
-     D WrkErrors       S              7S 0 Inz(0)
      D WrkMsg          S            200A    Inz(*Blanks)
      D WrkStatus       S             10A    Inz(*Blanks)
 
@@ -78,14 +74,12 @@
                Iter;
             Endif;
 
-            WrkTotal += 1;
             WrkItmnum  = STG_ITMNUM;
             WrkJobnum7 = STG_JOBNUM7;
 
             // Pre-check 1: does a PCR even exist for this Item/Job?
             Chain (WrkItmnum : WrkJobnum7) PCLMAIN08;
             If Not %Found(PCLMAIN08);
-               WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'No PCR found for this Item/Job';
                Exsr Sbr_Write_Result;
@@ -95,7 +89,6 @@
 
             // Pre-check 2: already closed/cancelled?
             If Mn8_Canwho <> *Blanks;
-               WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'Already closed/cancelled';
                Exsr Sbr_Write_Result;
@@ -136,7 +129,6 @@
             Endif;
 
             If WrkCount > 0;
-               WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'Item/Job is a component of another job''s kit';
                Exsr Sbr_Write_Result;
@@ -153,12 +145,10 @@
                               : 'N'
                               : 'Close'
                               : 'D' );
-               WrkClosed += 1;
                WrkStatus = 'CLOSED';
                WrkMsg = *Blanks;
                Exsr Sbr_Write_Result;
             On-Error;
-               WrkErrors += 1;
                WrkStatus = 'ERROR';
                WrkMsg = 'P1VCANCL call failed - review manually';
                Exsr Sbr_Write_Result;
@@ -167,10 +157,6 @@
             Read PCRCANSTG;
          Enddo;
 
-         DSPLY ('Total: ' + %Char(WrkTotal)
-              + '  Closed: ' + %Char(WrkClosed)
-              + '  Skipped: ' + %Char(WrkSkipped)
-              + '  Errors: ' + %Char(WrkErrors));
          *InLR = *On;
 
       /end-free
