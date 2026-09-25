@@ -1,35 +1,22 @@
      H DEBUG OPTION(*SRCSTMT:*NODEBUGIO) ALWNULL(*USRCTL)
-      //**********************************************************************
-      // P1VCANCL2
-      // PCR: Batch Close/Cancel PCRs
-      //**********************************************************************
-      // Reads a CSV-staged list of Item#/Job# pairs and, for each one,
-      // calls the existing P1VCANCL (the same worker program the F8
-      // Close/Cancel PCR screen calls) with fixed parameters matching
-      // the "Close" workflow:
-      //    Close/Cancel = 'Close'
-      //    POP This Item = 'N'
-      //    Item Status (Permot) = 'D'
-      //
-      // This deliberately reuses P1VCANCL rather than reimplementing its
-      // logic - that program touches ~15 files and calls two further
-      // programs (ACRAEBLDFL, P1RSNDCL) under certain conditions, and
-      // re-deriving all of that by hand risks silently dropping a rule.
-      //
-      // Before calling P1VCANCL, this program replicates the two
-      // pre-checks the screen programs (P1RCANCEL/P1VCANCEL) and
-      // P1VCANCL itself perform:
-      //   - already closed/cancelled (PCPMAIN.CANWHO not blank)
-      //   - item or job is a component of another job's kit - P1VCANCL
-      //     shows an interactive screen in this case (Exfmt Screen),
-      //     which cannot run in batch, so these rows are skipped here
-      //     instead of being sent into that call at all.
-      //
-      // Every row's outcome (closed / skipped+reason / error) is written
-      // to PCRCANRSLT so a run can be reviewed afterward. Re-running the
-      // same CSV is safe: already-closed rows are skipped again by the
-      // "already closed" check above, so nothing gets double-processed.
-      //**********************************************************************
+       //***********************************************************************
+       // P1VCANCL2
+       // PCR Batch Cancel
+       //***********************************************************************
+
+       //***********************************************************************
+       // Program Information
+       //-----------------------------------------------------------------------
+       // Batch-closes ~50 PCRs at a time via CSV, calling the existing
+       // P1VCANCL worker (same as the F8 Close/Cancel PCR screen) per row.
+       //***********************************************************************
+
+       //***********************************************************************
+       // Program History
+       //-----------------------------------------------------------------------
+       // Project   Date   Int Description
+       // ------- -------- --- -------------------------------------------------
+       // H33975  09/24/26 EFI PCR Upload Spreadsheet
 
       // Input Files
      FPCRCANSTG IF   E             DISK    EXTFILE('OBJECT/PCRCANSTG')
@@ -53,12 +40,6 @@
      F                                     PREFIX(Pmn_)
      F                                     RENAME(PCPMAIN$:PC$MAIN)
 
-      // Run results are written via embedded SQL INSERT (inline at
-      // each call site below) rather than a native F-spec -
-      // PCRCANRSLT is a plain SQL-created table whose record format
-      // name collides with its own file name (RNF2121/RNF7261 when
-      // accessed as an externally described output file), so SQL
-      // sidesteps that entirely.
 
       //***********************************************************************
       // Prototypes
@@ -81,12 +62,12 @@
      D WrkSkipped      S              7S 0 Inz(0)
      D WrkErrors       S              7S 0 Inz(0)
      D WrkMsg          S            200A    Inz(*Blanks)
-     D WrkStatus        S             10A    Inz(*Blanks)
+     D WrkStatus       S             10A    Inz(*Blanks)
 
-      //***********************************************************************
-      //* MAIN LINE
-      //***********************************************************************
-      /free
+       //***********************************************************************
+       //* MAIN LINE
+       //***********************************************************************
+       /free
 
          Read PCRCANSTG;
          Dow Not %Eof(PCRCANSTG);
@@ -107,10 +88,7 @@
                WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'No PCR found for this Item/Job';
-               Exec SQL
-                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
-                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
-                          CURRENT_TIMESTAMP);
+               Exsr Sbr_Write_Result;
                Read PCRCANSTG;
                Iter;
             Endif;
@@ -120,10 +98,7 @@
                WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'Already closed/cancelled';
-               Exec SQL
-                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
-                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
-                          CURRENT_TIMESTAMP);
+               Exsr Sbr_Write_Result;
                Read PCRCANSTG;
                Iter;
             Endif;
@@ -164,10 +139,7 @@
                WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'Item/Job is a component of another job''s kit';
-               Exec SQL
-                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
-                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
-                          CURRENT_TIMESTAMP);
+               Exsr Sbr_Write_Result;
                Read PCRCANSTG;
                Iter;
             Endif;
@@ -184,18 +156,12 @@
                WrkClosed += 1;
                WrkStatus = 'CLOSED';
                WrkMsg = *Blanks;
-               Exec SQL
-                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
-                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
-                          CURRENT_TIMESTAMP);
+               Exsr Sbr_Write_Result;
             On-Error;
                WrkErrors += 1;
                WrkStatus = 'ERROR';
                WrkMsg = 'P1VCANCL call failed - review manually';
-               Exec SQL
-                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
-                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
-                          CURRENT_TIMESTAMP);
+               Exsr Sbr_Write_Result;
             Endmon;
 
             Read PCRCANSTG;
@@ -207,4 +173,16 @@
               + '  Errors: ' + %Char(WrkErrors));
          *InLR = *On;
 
+      /end-free
+
+      //***********************************************************************
+      //* Subroutines
+      //***********************************************************************
+      /free
+         Begsr Sbr_Write_Result;
+            Exec SQL
+               INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
+               VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
+                       CURRENT_TIMESTAMP);
+         Endsr;
       /end-free
