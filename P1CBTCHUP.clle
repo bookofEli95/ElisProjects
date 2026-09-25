@@ -1,14 +1,13 @@
              /****************************************************************/
-             /* P1CCANCL2                                                    */
-             /* PCR: Batch Close/Cancel PCRs - CL driver                     */
+             /* P1CBTCHUP                                                    */
+             /* PCR: Batch Upload - CL driver                                */
              /****************************************************************/
              /* ************************************************************ */
              /* Program Information                                          */
              /* ------------------------------------------------------------ */
-             /* Loads a CSV of Item#/Job# pairs into PCRCANSTG, then runs    */
-             /* P1RCANCL2 to close each one via the same P1VCANCL worker the */
-             /* F8 Close/Cancel PCR screen uses. Review PCRCANRSLT afterward */
-             /* for the outcome of every row (CLOSED/SKIPPED/ERROR).         */
+             /* Loads a CSV of new titles into PCRSTAGE, then runs           */
+             /* P1RBTCHUP to create the job/item/catalog records for each    */
+             /* row.                                                         */
              /* ************************************************************ */
              /* ************************************************************ */
              /* Program History                                              */
@@ -25,19 +24,18 @@
              /* Build the IFS path */
              CHGVAR     VAR(&PATHT) VALUE(%TRIM(&IFSPATH))
 
-             /* 1. Wipe the staging and results tables clean */
-             CLRPFM     FILE(OBJECT/PCRCANSTG)
-             CLRPFM     FILE(OBJECT/PCRCANRSLT)
+             /* 1. Wipe the staging table clean */
+             CLRPFM     FILE(OBJECT/PCRSTAGE)
 
              /* 2. Upload the CSV into the staging table */
-             CPYFRMIMPF FROMSTMF(&PATHT) TOFILE(OBJECT/PCRCANSTG) +
+             CPYFRMIMPF FROMSTMF(&PATHT) TOFILE(OBJECT/PCRSTAGE) +
                           MBROPT(*ADD) RCDDLM(*CRLF) STRDLM(*DBLQUOTE) +
                           FLDDLM(',') RPLNULLVAL(*FLDDFT) ERRLVL(*NOMAX)
 
              /* 3. Call the RPGLE batch processing program */
-             CALL       PGM(OBJECT/P1RCANCL2)
+             CALL       PGM(OBJECT/P1RBTCHUP)
 
              /* 4. Clean up staging table */
-             CLRPFM     FILE(OBJECT/PCRCANSTG)
+             CLRPFM     FILE(OBJECT/PCRSTAGE)
 
              ENDPGM
