@@ -35,6 +35,7 @@
      FPCRCANSTG IF   E             DISK    EXTFILE('OBJECT/PCRCANSTG')
      F                                     EXTDESC('OBJECT/PCRCANSTG')
      F                                     PREFIX(STG_)
+     F                                     RENAME(PCRCANSTG:PCRCANST$)
      FPCLMAIN08 IF   E           K DISK    EXTFILE('OBJECT/PCLMAIN08')
      F                                     EXTDESC('OBJECT/PCLMAIN08')
      F                                     PREFIX(Mn8_)
@@ -56,6 +57,7 @@
      FPCRCANRSLTO    E             DISK    EXTFILE('OBJECT/PCRCANRSLT')
      F                                     EXTDESC('OBJECT/PCRCANRSLT')
      F                                     PREFIX(Rlt_)
+     F                                     RENAME(PCRCANRSLT:PCRCANRSL$)
 
       //***********************************************************************
       // Prototypes
@@ -196,12 +198,12 @@
       //***********************************************************************
       /free
          Begsr Sbr_Write_Result;
-            Clear PCRCANRSLT;
+            Clear PCRCANRSL$;
             Rlt_Itmnum  = WrkItmnum;
             Rlt_Jobnum7 = WrkJobnum7;
             Rlt_Status  = WrkStatus;
             Rlt_Reason  = WrkMsg;
             Rlt_RunTs   = %Timestamp();
-            Write PCRCANRSLT;
+            Write PCRCANRSL$;
          Endsr;
       /end-free
