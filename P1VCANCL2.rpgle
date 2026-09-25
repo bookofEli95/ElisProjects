@@ -53,10 +53,10 @@
      F                                     PREFIX(Pmn_)
      F                                     RENAME(PCPMAIN$:PC$MAIN)
 
-      // Run results are written via embedded SQL INSERT (see
-      // Sbr_Write_Result) rather than a native F-spec - PCRCANRSLT
-      // is a plain SQL-created table whose record format name
-      // collides with its own file name (RNF2121/RNF7261 when
+      // Run results are written via embedded SQL INSERT (inline at
+      // each call site below) rather than a native F-spec -
+      // PCRCANRSLT is a plain SQL-created table whose record format
+      // name collides with its own file name (RNF2121/RNF7261 when
       // accessed as an externally described output file), so SQL
       // sidesteps that entirely.
 
@@ -107,7 +107,10 @@
                WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'No PCR found for this Item/Job';
-               Exsr Sbr_Write_Result;
+               Exec SQL
+                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
+                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
+                          CURRENT_TIMESTAMP);
                Read PCRCANSTG;
                Iter;
             Endif;
@@ -117,7 +120,10 @@
                WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'Already closed/cancelled';
-               Exsr Sbr_Write_Result;
+               Exec SQL
+                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
+                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
+                          CURRENT_TIMESTAMP);
                Read PCRCANSTG;
                Iter;
             Endif;
@@ -158,7 +164,10 @@
                WrkSkipped += 1;
                WrkStatus = 'SKIPPED';
                WrkMsg = 'Item/Job is a component of another job''s kit';
-               Exsr Sbr_Write_Result;
+               Exec SQL
+                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
+                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
+                          CURRENT_TIMESTAMP);
                Read PCRCANSTG;
                Iter;
             Endif;
@@ -175,12 +184,18 @@
                WrkClosed += 1;
                WrkStatus = 'CLOSED';
                WrkMsg = *Blanks;
-               Exsr Sbr_Write_Result;
+               Exec SQL
+                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
+                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
+                          CURRENT_TIMESTAMP);
             On-Error;
                WrkErrors += 1;
                WrkStatus = 'ERROR';
                WrkMsg = 'P1VCANCL call failed - review manually';
-               Exsr Sbr_Write_Result;
+               Exec SQL
+                  INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
+                  VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
+                          CURRENT_TIMESTAMP);
             Endmon;
 
             Read PCRCANSTG;
@@ -192,16 +207,4 @@
               + '  Errors: ' + %Char(WrkErrors));
          *InLR = *On;
 
-      /end-free
-
-      //***********************************************************************
-      //* Subroutines
-      //***********************************************************************
-      /free
-         Begsr Sbr_Write_Result;
-            Exec SQL
-               INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
-               VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
-                       CURRENT_TIMESTAMP);
-         Endsr;
       /end-free
