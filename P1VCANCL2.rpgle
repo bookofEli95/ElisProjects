@@ -1,6 +1,6 @@
      H DEBUG OPTION(*SRCSTMT:*NODEBUGIO) ALWNULL(*USRCTL)
       //**********************************************************************
-      // P1VCANCLBAT
+      // P1VCANCL2
       // PCR: Batch Close/Cancel PCRs
       //**********************************************************************
       // Reads a CSV-staged list of Item#/Job# pairs and, for each one,

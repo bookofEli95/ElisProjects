@@ -1,7 +1,7 @@
              PGM
 
              /**************************************************/
-             /* P1CCANCLBAT                                     */
+             /* P1CCANCL2                                       */
              /* PCR: Batch Close/Cancel PCRs - CL driver         */
              /* Loads a CSV of Item#/Job# pairs into PCRCANSTG,  */
              /* then runs P1VCANCLBAT to close each one via the  */
@@ -22,6 +22,6 @@
                           FLDDLM(',') FROMRCD(2) ERRLVL(*NOMAX) +
                           RPLNULLVAL(*FLDDFT) RMVBLANK(*BOTH)
 
-             CALL       PGM(OBJECT/P1VCANCLBAT)
+             CALL       PGM(OBJECT/P1VCANCL2)
 
              ENDPGM
