@@ -53,11 +53,12 @@
      F                                     PREFIX(Pmn_)
      F                                     RENAME(PCPMAIN$:PC$MAIN)
 
-      // Output File - run results
-     FPCRCANRSLTO    E             DISK    EXTFILE('OBJECT/PCRCANRSLT')
-     F                                     EXTDESC('OBJECT/PCRCANRSLT')
-     F                                     PREFIX(Rlt_)
-     F                                     RENAME(PCRCANRSLT:PCRCANRSL$)
+      // Run results are written via embedded SQL INSERT (see
+      // Sbr_Write_Result) rather than a native F-spec - PCRCANRSLT
+      // is a plain SQL-created table whose record format name
+      // collides with its own file name (RNF2121/RNF7261 when
+      // accessed as an externally described output file), so SQL
+      // sidesteps that entirely.
 
       //***********************************************************************
       // Prototypes
@@ -198,12 +199,9 @@
       //***********************************************************************
       /free
          Begsr Sbr_Write_Result;
-            Clear PCRCANRSL$;
-            Rlt_Itmnum  = WrkItmnum;
-            Rlt_Jobnum7 = WrkJobnum7;
-            Rlt_Status  = WrkStatus;
-            Rlt_Reason  = WrkMsg;
-            Rlt_RunTs   = %Timestamp();
-            Write PCRCANRSL$;
+            Exec SQL
+               INSERT INTO PCRCANRSLT (ITMNUM, JOBNUM7, STATUS, REASON, RUNTS)
+               VALUES (:WrkItmnum, :WrkJobnum7, :WrkStatus, :WrkMsg,
+                       CURRENT_TIMESTAMP);
          Endsr;
       /end-free
