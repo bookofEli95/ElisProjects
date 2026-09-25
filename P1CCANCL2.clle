@@ -1,27 +1,43 @@
-             PGM
+             /****************************************************************/
+             /* P1CCANCL2                                                    */
+             /* PCR: Batch Close/Cancel PCRs - CL driver                     */
+             /****************************************************************/
+             /* ************************************************************ */
+             /* Program Information                                          */
+             /* ------------------------------------------------------------ */
+             /* Loads a CSV of Item#/Job# pairs into PCRCANSTG, then runs    */
+             /* P1VCANCL2 to close each one via the same P1VCANCL worker the */
+             /* F8 Close/Cancel PCR screen uses. Review PCRCANRSLT afterward */
+             /* for the outcome of every row (CLOSED/SKIPPED/ERROR).         */
+             /* ************************************************************ */
+             /* ************************************************************ */
+             /* Program History                                              */
+             /* ------------------------------------------------------------ */
+             /* Project   Date     Int Description                           */
+             /* ------- -------- --- --------------------------------------- */
+             /* H33975  09/25/26 EFI Parameterize for portal upload screen   */
+             /* ************************************************************ */
+             PGM        PARM(&IFSPATH)
 
-             /**************************************************/
-             /* P1CCANCL2                                       */
-             /* PCR: Batch Close/Cancel PCRs - CL driver         */
-             /* Loads a CSV of Item#/Job# pairs into PCRCANSTG,  */
-             /* then runs P1VCANCLBAT to close each one via the  */
-             /* same P1VCANCL worker the F8 screen uses.          */
-             /* Review PCRCANRSLT afterward for the outcome of   */
-             /* every row (CLOSED / SKIPPED / ERROR).             */
-             /**************************************************/
+             DCL        VAR(&IFSPATH) TYPE(*CHAR) LEN(256)
+             DCL        VAR(&PATHT)   TYPE(*CHAR) LEN(256)
 
-             DCL        VAR(&IFSFILE) TYPE(*CHAR) LEN(100) +
-                          VALUE('/home/ELIASI/pcrclose.csv')
+             /* Build the IFS path */
+             CHGVAR     VAR(&PATHT) VALUE(%TRIM(&IFSPATH))
 
+             /* 1. Wipe the staging and results tables clean */
              CLRPFM     FILE(OBJECT/PCRCANSTG)
              CLRPFM     FILE(OBJECT/PCRCANRSLT)
 
-             CPYFRMIMPF FROMSTMF(&IFSFILE) TOFILE(OBJECT/PCRCANSTG) +
-                          MBROPT(*REPLACE) FROMCCSID(1208) TOCCSID(*FILE) +
-                          RCDDLM(*CRLF) DTAFMT(*DLM) STRDLM('"') +
-                          FLDDLM(',') FROMRCD(2) ERRLVL(*NOMAX) +
-                          RPLNULLVAL(*FLDDFT) RMVBLANK(*BOTH)
+             /* 2. Upload the CSV into the staging table */
+             CPYFRMIMPF FROMSTMF(&PATHT) TOFILE(OBJECT/PCRCANSTG) +
+                          MBROPT(*ADD) RCDDLM(*CRLF) STRDLM(*DBLQUOTE) +
+                          FLDDLM(',') RPLNULLVAL(*FLDDFT) ERRLVL(*NOMAX)
 
+             /* 3. Call the RPGLE batch processing program */
              CALL       PGM(OBJECT/P1VCANCL2)
+
+             /* 4. Clean up staging table */
+             CLRPFM     FILE(OBJECT/PCRCANSTG)
 
              ENDPGM
