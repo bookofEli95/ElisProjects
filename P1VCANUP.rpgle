@@ -19,20 +19,26 @@
       //*****************************************************************
       // Variables
       //*****************************************************************
+      // Must match the upload widget's target directory on P1DCANUP
+     D UploadDir       C                   '/home/ELIASI/'
      D FullIFSPath     S            256A
 
       //*****************************************************************
       // MainLine
       //*****************************************************************
      C                   Dow       1=1
-     C                   Exfmt     UPLOAD
+     C                   Exfmt     ADD
 
      C                   If        btnUpload = *On
-     C                   Eval      FullIFSPath = '/tmp/pcr_uploads/' +
+     C                   Eval      FullIFSPath = UploadDir +
      C                                           %Trim(UPLOADFILE)
-     C                   Call      'P1CCANCL2'
+     C                   Call(E)   'P1CCANCL2'
      C                   Parm                    FullIFSPath
+      // On failure P1CCANCL2 has cleared PCRCANSTG and logged the
+      // reason in the job log; stay on the screen so the user can retry
+     C                   If        Not %Error
      C                   Leave
+     C                   Endif
      C                   Endif
 
      C                   Enddo
