@@ -1,0 +1,65 @@
+             /****************************************************************/
+             /* TOCUPCL                                                      */
+             /* PCR: TOC Song Upload - CL driver                             */
+             /****************************************************************/
+             /* ************************************************************ */
+             /* Program Information                                          */
+             /* ------------------------------------------------------------ */
+             /* Loads a CSV of Job#/Item#/Song# rows into TOCSTAGE, then     */
+             /* runs P1RTOCUP to process them. The CSV's first row is a      */
+             /* column-heading row and is skipped. On any failure the        */
+             /* staging table is cleared and an escape message is sent back  */
+             /* to the caller (TOVSONG).                                     */
+             /* ************************************************************ */
+             /* ************************************************************ */
+             /* Program History                                              */
+             /* ------------------------------------------------------------ */
+             /* Project   Date     Int Description                           */
+             /* ------- -------- --- --------------------------------------- */
+             /* NEW     09/25/26 ELI Skip CSV header row, read file as UTF-8,*/
+             /*                      monitor for errors and clean up         */
+             /* ************************************************************ */
+             PGM        PARM(&IFSPATH)
+
+             DCL        VAR(&IFSPATH) TYPE(*CHAR) LEN(256)
+             DCL        VAR(&PATHT)   TYPE(*CHAR) LEN(256)
+             DCL        VAR(&ERRMSG)  TYPE(*CHAR) LEN(300)
+
+             /* Build the IFS path */
+             CHGVAR     VAR(&PATHT) VALUE(%TRIM(&IFSPATH))
+
+             /* 1. Wipe the staging table clean */
+             CLRPFM     FILE(OBJECT/TOCSTAGE)
+
+             /* 2. Upload the CSV into the staging table.                */
+             /*    FROMRCD(2)     - skip the column-heading row          */
+             /*    FROMCCSID(1208)- Excel saves the template as UTF-8    */
+             CPYFRMIMPF FROMSTMF(&PATHT) TOFILE(OBJECT/TOCSTAGE) +
+                          MBROPT(*ADD) FROMCCSID(1208) RCDDLM(*CRLF) +
+                          STRDLM(*DBLQUOTE) FLDDLM(',') +
+                          RPLNULLVAL(*FLDDFT) FROMRCD(2) ERRLVL(*NOMAX)
+             MONMSG     MSGID(CPF0000) EXEC(DO)
+                CHGVAR     VAR(&ERRMSG) VALUE('CSV import failed for' +
+                             *BCAT %TRIM(&PATHT) *BCAT '- see job log')
+                GOTO       CMDLBL(ERROR)
+             ENDDO
+
+             /* 3. Call the RPGLE batch processing program */
+             CALL       PGM(OBJECT/P1RTOCUP)
+             MONMSG     MSGID(CPF0000) EXEC(DO)
+                CHGVAR     VAR(&ERRMSG) VALUE('P1RTOCUP failed +
+                             processing the uploaded CSV - see job log')
+                GOTO       CMDLBL(ERROR)
+             ENDDO
+
+             /* 4. Clean up staging table */
+             CLRPFM     FILE(OBJECT/TOCSTAGE)
+             RETURN
+
+             /* Error: clean up and tell the caller the upload failed */
+ ERROR:      CLRPFM     FILE(OBJECT/TOCSTAGE)
+             MONMSG     MSGID(CPF0000)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QSYS/QCPFMSG) MSGDTA(&ERRMSG) +
+                          MSGTYPE(*ESCAPE)
+
+             ENDPGM
