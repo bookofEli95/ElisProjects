@@ -8,6 +8,26 @@ review is open.
 Nothing here decides pricing policy. The policy is data in `IVPRPCRUL`, and the
 programs match an item to a row and do the arithmetic.
 
+## Decisions (Paul Moore, 27 Sep 2026)
+
+- **Pricing model: the Manual Price Change Brackets**, for every catalogue.
+  That is the seeded default (`RPCMODEL 'B'`). The question about which rate
+  the Evaluating document's examples used no longer matters for the build.
+- **The 2022 staged prices move to the new model** "so everything runs on the
+  same system". Seed default is now `RPCPRCUACT 'S'`; each catalogue's
+  `IVPORRPRCU` rows are deleted the day it is switched on.
+- **V1 keeps the manual step at reprint**: the editor approves the price, and it
+  is copied onto the item by hand at the reprint, as today.
+
+Still open: how cheap items (choral octavos, instrumental parts under $5) should
+be treated under the brackets, and whether titles qualify after 12 or 18 months
+without a price change.
+
+Related tickets Paul has asked to fold into this project, all part of removing
+prices from the back of books: SOS-2092 (a field saying whether a product has a
+printed price), SOS-2520 (a field saying whether a price change needs third-party
+approval) and BS-1572 (changes to ISBN and QR code generation).
+
 ## What was added
 
 | Object | Kind | Purpose |

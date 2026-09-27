@@ -63,21 +63,20 @@
 --              writes IVPITEMS directly and is there for a phase in
 --              which that no longer matters.
 --
---   RPCPRCUACT 'D' - defer to a price still staged in IVPORRPRCU.
---              That file is a one-off load from January 2022 ("Online
---              Rerun item price updates"): 4,382 rows, of which 111 have
---              been used or removed since. No program loads it. Its
---              rises are +$0.05/+$0.10/+$0.15 on 3,367 rows and +$5/+$10
---              on 1,014 - neither 2026 pricing document. A row is only
---              still current if the title's price has not moved since
---              2022, which is exactly the titles this project targets,
---              so 'D' lets a four-year-old rise win over the new rule.
---              It is the seed only because it is what happens today
---              without this process. Decide per catalogue: 'S' raises
---              the suggestion anyway and shows the 2022 price on it;
---              then retire that catalogue's staged rows so IVRORRNWPR
---              cannot overtake the editor:
+--   RPCPRCUACT 'S' - supersede prices still staged in IVPORRPRCU.
+--              Decided 27 Sep 2026: the January 2022 load (choral and
+--              band prices, run by IVRORRNWPR) is to move to the new
+--              model "so everything runs on the same system". Each
+--              suggestion that replaces a staged 2022 price says so in
+--              its note, with the price.
+--
+--              When a catalogue is switched on, retire its 2022 rows
+--              the same day, or IVRORRNWPR can copy a 2022 price into
+--              NEWPRICE for a title reaching the queue before the next
+--              monthly run:
 --                DELETE FROM OBJECT/IVPORRPRCU WHERE DIVCAT = <catalogue>
+--              Once every catalogue is on, the file is empty and
+--              IVRORRNWPR has nothing left to do.
 --
 --   RPCFLDLST  The IVPMAINT.FLDNAM values a price change is logged
 --              under. Three spellings are in use for the one event, and
@@ -117,7 +116,7 @@ VALUES
    'Y', '   ', 'H',
    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
    DATE('1900-01-01'), 'Y',
-   'Q', 'D', CURRENT TIMESTAMP, 'SEED');
+   'Q', 'S', CURRENT TIMESTAMP, 'SEED');
 
 -- ------------------------------------------------------------------
 -- Example of opting one catalogue in to phase 1. DIVCAT is a
@@ -136,4 +135,4 @@ VALUES
 --    'Y', '   ', 'H',
 --    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
 --    DATE('1900-01-01'), 'Y',
---    'Q', 'D', CURRENT TIMESTAMP, 'SEED');
+--    'Q', 'S', CURRENT TIMESTAMP, 'SEED');
