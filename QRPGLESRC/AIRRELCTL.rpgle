@@ -71,6 +71,8 @@
      D PrmOrdnum       S              8A
      D PrmSdatc        S              6A
      D WrkPickPut      S              1A
+     D WrkOrig         S              1A
+     D WrkPlpFnd       S              1A
      D WrkCommand      S           1024A
 
      D WrkMsgTxt       S            132A
@@ -85,14 +87,20 @@
        //*************
        Exec Sql Set Option Commit=*None, CloSqlCsr=*EndMod;
 
+       // IN (subquery) rather than a join, so a duplicate control row can
+       // never return the same batch twice. Mirakl/Amazon keep the
+       // original AIRRELCTL selection (no BCHSTS filter).
        Exec Sql declare cur_Bch cursor for
             select b.*
               from oepbchk b
-                join oepedtswp s
-                  on ucase(rtrim(s.desc)) = ucase(rtrim(b.desc20))
-                    where b.edtb# <> 0
-                      and b.bchsts <> 'C'
-                      and s.active = 'Y'
+                where b.edtb# <> 0
+                  and ucase(rtrim(b.desc20)) in
+                      (select ucase(rtrim(s.desc))
+                         from oepedtswp s
+                        where s.active = 'Y')
+                  and (b.bchsts <> 'C'
+                       or ucase(b.desc20) in ('MIRAKL EDI',
+                                              'AMAZON.COM NOTE'))
             order by b.edtb#;
 
        Exec Sql Open cur_Bch;
@@ -103,6 +111,12 @@
        Exec Sql Fetch cur_Bch Into :Bch@Ds;
 
        Dow SqlCod = 0;
+
+         WrkOrig = 'N';
+         If %Upper(%Trim(Bch@Ds.Desc20)) = 'MIRAKL EDI'
+         or %Upper(%Trim(Bch@Ds.Desc20)) = 'AMAZON.COM NOTE';
+           WrkOrig = 'Y';
+         Endif;
 
          Exsr Sbr_Credit_Release;
          Exsr Sbr_Order_History;
@@ -181,8 +195,7 @@
          // behavior - submit OECPRTSD directly with no assigned
          // shipping-doc date. Every other channel still gets the
          // OERSDDAT/PLCCHKSGL date logic.
-         If %Upper(%Trim(Bch@Ds.Desc20)) = 'MIRAKL EDI'
-         or %Upper(%Trim(Bch@Ds.Desc20)) = 'AMAZON.COM NOTE';
+         If WrkOrig = 'Y';
            WrkCommand = 'SBMJOB CMD(CALL PGM(OECPRTSD)) '
                       + 'JOB(SDOC_'
                       + $E#1
@@ -258,14 +271,22 @@
            // Same Ordsts/PickMthd rules OERSLSD applies on a manual release -
            // a batch-description override in PLPEBDESC wins, otherwise fall
            // back to the order's phone code.
+           // Mirakl/Amazon skip the PLPEBDESC lookup - original AIRRELCTL
+           // used the phone code only.
            WrkPickPut = *Blanks;
-           Exec Sql
-             select PickPut into :WrkPickPut
-               from PLPEBDESC
-                 where Desc20 = :Bch@Ds.Desc20
-                 fetch first row only;
+           WrkPlpFnd = 'N';
+           If WrkOrig = 'N';
+             Exec Sql
+               select PickPut into :WrkPickPut
+                 from PLPEBDESC
+                   where Desc20 = :Bch@Ds.Desc20
+                   fetch first row only;
+             If Sqlcode = 0;
+               WrkPlpFnd = 'Y';
+             Endif;
+           Endif;
 
-           If Sqlcode = 0;
+           If WrkPlpFnd = 'Y';
              If WrkPickPut = 'K';
                Hst@Ds.Ordsts   = 'W';
                Hst@Ds.PickMthd = 'T'; // Change to PUT
