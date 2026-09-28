@@ -32,14 +32,14 @@
      A*
      A*  Subfile record - one repricing suggestion
      A          R RPCSFL1                   SFL
-     A            SOPT           2A  B  7  2VALUES(' ' '2' '4' '6')
-     A            SITEM          8S 0O  7  5
+     A            SOPT           1A  B  7  3VALUES(' ' '2' '4' '6')
+     A            SITEM          8S 0O  7  6
      A            SCYCL          6S 0H
-     A            SDESC         18A  O  7 14
+     A            SDESC         17A  O  7 15
      A            SSTAT          1A  O  7 33
-     A            SCUR           7S 2O  7 35
-     A            SSUG           7S 2O  7 44
-     A            SNEW           7S 2B  7 53
+     A            SCUR           7S 2O  7 35EDTCD(3)
+     A            SSUG           7S 2O  7 44EDTCD(3)
+     A            SNEW           7S 2B  7 53EDTCD(4)
      A            SDUE            L  O  7 62DATFMT(*MDY)
      A                                      DATSEP('/')
      A            SLSTC           L  O  7 71DATFMT(*MDY)
@@ -68,8 +68,8 @@
      A            WSTAT          1A  B  3 53
      A                                  3 56'blank = open'
      A                                  5  2'Opt'
-     A                                  5  5'Item'
-     A                                  5 14'Description'
+     A                                  5  6'Item'
+     A                                  5 15'Description'
      A                                  5 32'St'
      A                                  5 35'Current'
      A                                  5 45'Suggest'
