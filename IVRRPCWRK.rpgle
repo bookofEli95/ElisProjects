@@ -108,6 +108,7 @@
 
             Exsr Sbr_Load_Subfile;
 
+            Write RPCFTR1;
             Exfmt RPCCTL1;
 
             Select;

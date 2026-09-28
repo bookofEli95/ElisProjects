@@ -37,9 +37,9 @@
      A            SCYCL          6S 0H
      A            SDESC         17A  O  7 15
      A            SSTAT          1A  O  7 33
-     A            SCUR           7S 2O  7 35EDTCD(3)
-     A            SSUG           7S 2O  7 44EDTCD(3)
-     A            SNEW           7S 2B  7 53EDTCD(4)
+     A            SCUR           7S 2O  7 35EDTCDE(3)
+     A            SSUG           7S 2O  7 44EDTCDE(3)
+     A            SNEW           7S 2B  7 53EDTCDE(4)
      A            SDUE            L  O  7 62DATFMT(*MDY)
      A                                      DATSEP('/')
      A            SLSTC           L  O  7 71DATFMT(*MDY)
@@ -76,6 +76,13 @@
      A                                  5 55'New'
      A                                  5 64'Due'
      A                                  5 71'Repriced'
+     A*
+     A*  Footer - the message line and the keys. A record of its own,
+     A*  because a control record takes up every line from its first
+     A*  to its last, so lines below the subfile would overlap it.
+     A*  Written before each EXFMT of RPCCTL1.
+     A          R RPCFTR1
+     A                                      OVERLAY
      A            WMSG          78A  O 21  2DSPATR(HI)
      A                                 22  2'2=Override   4=Reject   6=Approve'
      A                                 23  2'F3=Exit   F5=Refresh   F12=Cancel'
