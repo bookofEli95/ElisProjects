@@ -37,9 +37,9 @@
      A            SCYCL          6S 0H
      A            SDESC         17A  O  7 15
      A            SSTAT          1A  O  7 33
-     A            SCUR           7S 2O  7 35EDTCDE(3)
-     A            SSUG           7S 2O  7 44EDTCDE(3)
-     A            SNEW           7S 2B  7 53EDTCDE(4)
+     A            SCUR           7Y 2O  7 35EDTCDE(3)
+     A            SSUG           7Y 2O  7 44EDTCDE(3)
+     A            SNEW           7Y 2B  7 53EDTCDE(4)
      A            SDUE            L  O  7 62DATFMT(*MDY)
      A                                      DATSEP('/')
      A            SLSTC           L  O  7 71DATFMT(*MDY)
