@@ -32,6 +32,21 @@
          PrmSdatc Char(6);
        End-PR;
 
+       // Writes one free-text line to the job log (CPF9898 is IBM's
+       // generic "send this text as-is" message - no custom message
+       // file needed).
+       Dcl-PR QMHSNDPM ExtPgm('QMHSNDPM');
+         MsgID       Char(7)   Const;
+         QualMsgF    Char(20)  Const;
+         MsgDta      Char(132) Const;
+         MsgDtaLen   Int(10)   Const;
+         MsgType     Char(10)  Const;
+         CallStkEnt  Char(10)  Const;
+         CallStkCnt  Int(10)   Const;
+         MsgKey      Char(4);
+         ErrorCode   Char(8)   Const;
+       End-PR;
+
        //***********************************************************************
        //* Entry Parameters *
        //********************
@@ -58,6 +73,13 @@
      D WrkPickPut      S              1A
      D WrkCommand      S           1024A
 
+     D WrkMsgTxt       S            132A
+     D WrkMsgKey       S              4A
+     D WrkErrCde       S              8A   Inz(x'0000000000000000')
+     D WrkOrdCnt       S              5  0
+     D WrkTotBch       S              5  0 Inz(0)
+     D WrkTotOrd       S              7  0 Inz(0)
+
        //***********************************************************************
        //* Main Line *
        //*************
@@ -69,6 +91,7 @@
                 join oepedtswp s
                   on ucase(rtrim(s.desc)) = ucase(rtrim(b.desc20))
                     where b.edtb# <> 0
+                      and b.bchsts <> 'C'
                       and s.active = 'Y'
             order by b.edtb#;
 
@@ -85,8 +108,20 @@
          Exsr Sbr_Order_History;
          Exsr Sbr_Shipping_Doc;
 
+         WrkTotBch += 1;
+         WrkTotOrd += WrkOrdCnt;
+         WrkMsgTxt = 'AIRRELCTL released Edtb# ' + %Char(Bch@Ds.Edtb#)
+                   + ' Keyb# ' + %Char(Bch@Ds.Keyb#)
+                   + ' Desc ' + %Trim(Bch@Ds.Desc20)
+                   + ' Orders ' + %Char(WrkOrdCnt);
+         Exsr Sbr_Log;
+
          Exec Sql Fetch cur_Bch Into :Bch@Ds;
        Enddo;
+
+       WrkMsgTxt = 'AIRRELCTL run total - Batches ' + %Char(WrkTotBch)
+                 + ' Orders ' + %Char(WrkTotOrd);
+       Exsr Sbr_Log;
 
        *InLR = *On;
 
@@ -97,6 +132,15 @@
        // /****************************************************************\ *
        //< SUBROUTINES >*
        // \****************************************************************/ *
+
+       //***********************************************************************
+       //* Write one line to the job log
+       //******************
+       Begsr Sbr_Log;
+         Callp QMHSNDPM('CPF9898':'QCPFMSG   *LIBL':WrkMsgTxt:
+                         %Len(%Trimr(WrkMsgTxt)):'*INFO':'*':0:
+                         WrkMsgKey:WrkErrCde);
+       Endsr;
 
        //***********************************************************************
        //* Credit Release for Shipping
@@ -161,6 +205,8 @@
        //* Generate Order History
        //******************
        Begsr Sbr_Order_History;
+
+         WrkOrdCnt = 0;
 
          Exec Sql declare cur_Trk cursor for
               select Ordnum,
@@ -228,6 +274,7 @@
            //...Call ODRBLDTYPE to type all orders in batch
            PrmOrdnum = %Editc(Trk@Ds.Ordnum:'X');
            Callp ODRBLDTYPE(PrmOrdNum);
+           WrkOrdCnt += 1;
 
            Exec Sql Fetch cur_Trk Into :Trk@Ds.Ordnum,
                                        :Trk@Ds.Keyb#,
