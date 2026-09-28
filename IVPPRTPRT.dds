@@ -1,5 +1,5 @@
      A**********************************************************
-     A* IVPPRTPRI
+     A* IVPPRTPRT
      A* Item printed price and third-party approval
      A**********************************************************
      A* SOS-2092 and SOS-2520, combined as SOS-2520 asks. A file of
@@ -29,7 +29,7 @@
      A**********************************************************
      A                                      REF(OBJECT/FIELD_REF FIELD$REF)
      A                                      UNIQUE
-     A          R IV$PRTPRI                 TEXT('Printed price and approval')
+     A          R IV$PRTPRT                 TEXT('Printed price and approval')
      A            ITMNUM    R
      A            PRTPRC         1A         TEXT('Printed price Y N S blank')
      A                                      COLHDG('PRINTED' 'PRICE')

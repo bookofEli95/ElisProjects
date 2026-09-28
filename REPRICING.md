@@ -30,7 +30,7 @@ approval) and BS-1572 (changes to ISBN and QR code generation).
 
 ## Printed price and third-party approval (SOS-2092, SOS-2520)
 
-Both flags live in one new file, **`IVPPRTPRI`**, keyed by item — the file Kyle
+Both flags live in one new file, **`IVPPRTPRT`**, keyed by item — the file Kyle
 Swanson proposed on SOS-2092, with the SOS-2520 flag added because that ticket
 asks for the two to be combined. Not new fields on `IVPITEMS`: that would mean
 recompiling every program that uses it, and the `SYNC_IVPITEMS` triggers copy
@@ -85,7 +85,7 @@ Still to build, once decided:
 | `IVPRPCLAD` | PF | Price ladder rungs (Choral octavos) |
 | `IVPRPCSUG` | PF | One suggestion per item per cycle, with its full audit |
 | `IVPRPCSG1` | LF | Suggestions by catalogue and status — the editor queue and report path |
-| `IVPPRTPRI` | PF | Printed price and third-party approval per item (SOS-2092, SOS-2520) |
+| `IVPPRTPRT` | PF | Printed price and third-party approval per item (SOS-2092, SOS-2520) |
 | `IVVRPCWRK` | DSPF | Work with Repricing Suggestions |
 | `IVRRPCGEN` | RPGLE | Generates suggestions |
 | `IVRRPCWRK` | RPGLE | Editor approves, overrides or rejects |
@@ -353,7 +353,7 @@ for the queue row at approval time, not just at generation.
 - **Eligibility.** A title repriced within `RPCELGMO` months is left alone.
 - **Caps.** `RULCAPPCT` and `RULCAPAMT` limit the rise; the budget floor may
   lift a price back above a cap, which the source explicitly allows.
-- **Third-party approval.** Titles flagged `IVPPRTPRI.TPAPRV 'Y'` are held or
+- **Third-party approval.** Titles flagged `IVPPRTPRT.TPAPRV 'Y'` are held or
   skipped (`RPCAUTACT`), and phase 2 never applies a price by itself unless the
   flag is `N`. See *Printed price and third-party approval*.
 - **Overrides.** An override below the current price is refused outright. An

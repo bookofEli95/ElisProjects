@@ -53,7 +53,7 @@
 --              corrections on the same page are left alone.
 --
 --   RPCAPLTGT  'P' - where an approved price goes is decided per
---              title by the printed-price flag, IVPPRTPRI.PRTPRC
+--              title by the printed-price flag, IVPPRTPRT.PRTPRC
 --              (SOS-2092). A title known to have no printed price
 --              ('N') gets it on the item straight away; anything
 --              printed, stickered or not known has it staged on the
@@ -64,7 +64,7 @@
 --              price straight to the item.
 --
 --   RPCAUTACT  'H' - a title flagged as needing third-party approval
---              (IVPPRTPRI.TPAPRV 'Y', SOS-2520) is written held, for an
+--              (IVPPRTPRT.TPAPRV 'Y', SOS-2520) is written held, for an
 --              editor to clear once approval is in. 'S' skips it.
 --
 --   RPCPRCUACT 'S' - supersede prices still staged in IVPORRPRCU.

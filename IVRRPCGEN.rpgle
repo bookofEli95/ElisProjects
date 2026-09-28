@@ -56,8 +56,8 @@
      F                                     EXTDESC('OBJECT/IVPORRPRCU')
      F                                     PREFIX(PRU_)
       // Printed price and third-party approval (SOS-2092, SOS-2520).
-     FIVPPRTPRI IF   E           K DISK    EXTFILE('OBJECT/IVPPRTPRI')
-     F                                     EXTDESC('OBJECT/IVPPRTPRI')
+     FIVPPRTPRT IF   E           K DISK    EXTFILE('OBJECT/IVPPRTPRT')
+     F                                     EXTDESC('OBJECT/IVPPRTPRT')
      F                                     PREFIX(PPR_)
 
       // Update / Add Files
@@ -555,8 +555,8 @@
                WrkDirect = 'Y';
             Endif;
             If CTL_RPCAPLTGT = 'P';
-               Chain (WrkCndItem) IVPPRTPRI;
-               If %Found(IVPPRTPRI) And PPR_PRTPRC = 'N';
+               Chain (WrkCndItem) IVPPRTPRT;
+               If %Found(IVPPRTPRT) And PPR_PRTPRC = 'N';
                   WrkDirect = 'Y';
                Endif;
             Endif;
@@ -763,7 +763,7 @@
       /free
          Begsr Sbr_Check_Authority;
 
-            // IVPPRTPRI.TPAPRV 'Y' marks a title whose price change needs
+            // IVPPRTPRT.TPAPRV 'Y' marks a title whose price change needs
             // a third party's approval first (SOS-2520). Blank or no row
             // means not known, which is the state of nearly every title
             // until the flag is populated. It does not hold a suggestion:
@@ -771,8 +771,8 @@
             // phase 2 IVRRPCAPL only applies a price by itself when the
             // title is known not to need approval (TPAPRV 'N').
             WrkAuthHld = 'N';
-            Chain (WrkCndItem) IVPPRTPRI;
-            If %Found(IVPPRTPRI) And PPR_TPAPRV = 'Y';
+            Chain (WrkCndItem) IVPPRTPRT;
+            If %Found(IVPPRTPRT) And PPR_TPAPRV = 'Y';
                If CTL_RPCAUTACT = 'S';
                   WrkAuthHld = 'S';
                Else;

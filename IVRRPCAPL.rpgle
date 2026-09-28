@@ -74,8 +74,8 @@
      F                                     EXTDESC('OBJECT/MFPUSERS')
      F                                     PREFIX(USR_)
       // Printed price and third-party approval (SOS-2092, SOS-2520).
-     FIVPPRTPRI IF   E           K DISK    EXTFILE('OBJECT/IVPPRTPRI')
-     F                                     EXTDESC('OBJECT/IVPPRTPRI')
+     FIVPPRTPRT IF   E           K DISK    EXTFILE('OBJECT/IVPPRTPRT')
+     F                                     EXTDESC('OBJECT/IVPPRTPRT')
      F                                     PREFIX(PPR_)
 
       // Output Files
@@ -314,7 +314,7 @@
             // on the re-run queue for the reprint? Straight on only when
             // the catalogue says so (RPCAPLTGT 'I'), or when it goes by
             // the printed-price flag ('P') and the title is known to have
-            // no printed price (IVPPRTPRI.PRTPRC 'N'). Anything printed,
+            // no printed price (IVPPRTPRT.PRTPRC 'N'). Anything printed,
             // stickered or not known waits: the copies in stock carry the
             // old price until the new ones exist.
             //
@@ -323,8 +323,8 @@
             // price by itself for those - see the Select below.
             WrkDirect = 'N';
             WrkTpaNo  = 'N';
-            Chain (WrkSugItem) IVPPRTPRI;
-            If %Found(IVPPRTPRI);
+            Chain (WrkSugItem) IVPPRTPRT;
+            If %Found(IVPPRTPRT);
                If PPR_TPAPRV = 'N';
                   WrkTpaNo = 'Y';
                Endif;
