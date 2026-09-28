@@ -22,6 +22,11 @@
 /* seeded control row leaves every catalogue at phase 0, so nothing    */
 /* runs until one is opted in.                                         */
 /*                                                                    */
+/* It can be run again after a failure: files already created are     */
+/* kept, and it carries on from where it stopped. If a create fails,   */
+/* it ends with a message naming the object, and the reason is in the  */
+/* compile listing (WRKSPLF).                                          */
+/*                                                                    */
 /* The three seed scripts are run afterwards, not from here, because   */
 /* seeding is a data decision and this is an object build:             */
 /*                                                                    */
@@ -37,27 +42,71 @@
 /*====================================================================*/
              PGM
 
+             DCL        VAR(&STEP)  TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSGID) TYPE(*CHAR) LEN(7)
+
+             /* Any create that fails stops the build at ERROR, which    */
+             /* names the object it was on, instead of ending in a      */
+             /* function check and a program dump.                      */
+             MONMSG     MSGID(CPF0000 MCH0000) EXEC(GOTO CMDLBL(ERROR))
+
              /* ---- files ------------------------------------------- */
+             /* A physical file that already exists is kept, not        */
+             /* rebuilt, so a second run cannot lose seeded rules or    */
+             /* suggestions. To rebuild one on purpose, DLTF it first.  */
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCCTL')
+             CHKOBJ     OBJ(OBJECT/IVPRPCCTL) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
              CRTPF      FILE(OBJECT/IVPRPCCTL) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCCTL) +
                           TEXT('Re-run repricing control')
+             ENDDO
+
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCRUL')
+             CHKOBJ     OBJ(OBJECT/IVPRPCRUL) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
              CRTPF      FILE(OBJECT/IVPRPCRUL) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCRUL) +
                           TEXT('Re-run repricing rules')
+             ENDDO
+
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCLAD')
+             CHKOBJ     OBJ(OBJECT/IVPRPCLAD) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
              CRTPF      FILE(OBJECT/IVPRPCLAD) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCLAD) +
                           TEXT('Re-run repricing price ladder')
+             ENDDO
+
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCSUG')
+             CHKOBJ     OBJ(OBJECT/IVPRPCSUG) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
              CRTPF      FILE(OBJECT/IVPRPCSUG) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCSUG) +
                           TEXT('Re-run repricing suggestions')
-             CRTLF      FILE(OBJECT/IVPRPCSG1) SRCFILE(SOURCE/QDDSSRC) +
-                          SRCMBR(IVPRPCSG1) +
-                          TEXT('Repricing suggestions by catalogue')
+             ENDDO
+
+             CHGVAR     VAR(&STEP) VALUE('IVPPRTPRT')
+             CHKOBJ     OBJ(OBJECT/IVPPRTPRT) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
              CRTPF      FILE(OBJECT/IVPPRTPRT) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPPRTPRT) +
                           TEXT('Item printed price and approval')
+             ENDDO
+
+             /* The logical and the display file hold no data, so they  */
+             /* are always rebuilt from the current source.             */
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCSG1')
+             DLTF       FILE(OBJECT/IVPRPCSG1)
+             MONMSG     MSGID(CPF2105)
+             CRTLF      FILE(OBJECT/IVPRPCSG1) SRCFILE(SOURCE/QDDSSRC) +
+                          SRCMBR(IVPRPCSG1) +
+                          TEXT('Repricing suggestions by catalogue')
 
              /* ---- display file ----------------------------------- */
+             CHGVAR     VAR(&STEP) VALUE('IVVRPCWRK')
+             DLTF       FILE(OBJECT/IVVRPCWRK)
+             MONMSG     MSGID(CPF2105)
              CRTDSPF    FILE(OBJECT/IVVRPCWRK) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVVRPCWRK) +
                           TEXT('Work with repricing suggestions')
@@ -68,16 +117,22 @@
              /* tables without a library; DFTRDBCOL(OBJECT) points     */
              /* those at OBJECT, the same files the F-specs open, so   */
              /* the library list at run time does not matter.          */
+             /* Programs are replaced if they already exist.           */
+             CHGVAR     VAR(&STEP) VALUE('IVRRPCGEN')
              CRTSQLRPGI OBJ(OBJECT/IVRRPCGEN) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCGEN) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
                           DFTRDBCOL(OBJECT) +
                           TEXT('Generate repricing suggestions')
+
+             CHGVAR     VAR(&STEP) VALUE('IVRRPCAPL')
              CRTSQLRPGI OBJ(OBJECT/IVRRPCAPL) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCAPL) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
                           DFTRDBCOL(OBJECT) +
                           TEXT('Apply and expire repricing suggestions')
+
+             CHGVAR     VAR(&STEP) VALUE('IVRRPCWRK')
              CRTSQLRPGI OBJ(OBJECT/IVRRPCWRK) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCWRK) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
@@ -85,6 +140,7 @@
                           TEXT('Work with repricing suggestions')
 
              /* ---- monthly driver -------------------------------- */
+             CHGVAR     VAR(&STEP) VALUE('IVCRPCMTH')
              CRTBNDCL   PGM(OBJECT/IVCRPCMTH) SRCFILE(SOURCE/QCLLESRC) +
                           SRCMBR(IVCRPCMTH) +
                           TEXT('Re-run repricing monthly run')
@@ -92,5 +148,16 @@
              SNDPGMMSG  MSG('Repricing objects created. Seed the three +
                           control files before opting any catalogue +
                           in to phase 1.')
+
+             RETURN
+
+ ERROR:      RCVMSG     MSGTYPE(*EXCP) RMV(*NO) MSGID(&MSGID)
+             MONMSG     MSGID(CPF0000)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('IVCRPCBLD stopped creating ' *CAT +
+                          &STEP *TCAT ' (' *CAT &MSGID *TCAT +
+                          ') - see the job log and its compile +
+                          listing in WRKSPLF') +
+                          MSGTYPE(*ESCAPE)
 
              ENDPGM
