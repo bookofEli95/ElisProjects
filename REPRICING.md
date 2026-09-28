@@ -467,7 +467,7 @@ Two things to check before a pilot:
     2022 STAGED PRICE n.nn (IVPORRPRCU)"*, so the editor chooses between the two.
     Then retire that catalogue's staged rows, or `IVRORRNWPR` may copy the 2022
     price into `NEWPRICE` before the editor approves:
-    `DELETE FROM OBJECT/IVPORRPRCU WHERE DIVCAT = <catalogue>`. If that is
+    `DELETE FROM OBJECT.IVPORRPRCU WHERE DIVCAT = <catalogue>`. If that is
     forgotten, the applier rejects the approval visibly (*"QUEUE ALREADY HAS A
     NEW PRICE"*) rather than overwriting.
 
@@ -475,7 +475,7 @@ Two things to check before a pilot:
 
   ```sql
   SELECT PRICE112, NEWPRICE, COUNT(*) AS N
-    FROM OBJECT/IVPORRPRCU
+    FROM OBJECT.IVPORRPRCU
    WHERE NEWPRICE - PRICE112 < 1
    GROUP BY PRICE112, NEWPRICE
    ORDER BY N DESC
@@ -484,8 +484,8 @@ Two things to check before a pilot:
   SELECT P.DIVCAT,
          SUM(CASE WHEN P.PRICE112 = I.PRICE112 THEN 1 ELSE 0 END) AS CURRENT_ROWS,
          SUM(CASE WHEN P.PRICE112 <> I.PRICE112 THEN 1 ELSE 0 END) AS STALE_ROWS
-    FROM OBJECT/IVPORRPRCU P
-    JOIN OBJECT/IVPITEMS I ON I.ITMNUM = P.ITMNUM
+    FROM OBJECT.IVPORRPRCU P
+    JOIN OBJECT.IVPITEMS I ON I.ITMNUM = P.ITMNUM
    GROUP BY P.DIVCAT
    ORDER BY CURRENT_ROWS DESC
   ```
@@ -532,7 +532,7 @@ Which program writes it shows up in the audit rows themselves:
 SELECT MAINTWHO, UPPER(TRIM(FLDNAM)) AS FLD, COMMENT, COUNT(*) AS N,
        MIN(MAINTYYYY * 10000 + MAINTMM * 100 + MAINTDD) AS FIRST_DT,
        MAX(MAINTYYYY * 10000 + MAINTMM * 100 + MAINTDD) AS LAST_DT
-  FROM OBJECT/IVPMAINT
+  FROM OBJECT.IVPMAINT
  WHERE UPPER(TRIM(FLDNAM)) IN ('PRICE', 'PRICE72', 'PRICE112')
    AND MAINTYYYY >= 2025
  GROUP BY MAINTWHO, UPPER(TRIM(FLDNAM)), COMMENT

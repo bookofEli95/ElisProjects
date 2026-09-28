@@ -78,7 +78,7 @@
 --              the same day, or IVRORRNWPR can copy a 2022 price into
 --              NEWPRICE for a title reaching the queue before the next
 --              monthly run:
---                DELETE FROM OBJECT/IVPORRPRCU WHERE DIVCAT = <catalogue>
+--                DELETE FROM OBJECT.IVPORRPRCU WHERE DIVCAT = <catalogue>
 --              Once every catalogue is on, the file is empty and
 --              IVRORRNWPR has nothing left to do.
 --
@@ -108,7 +108,7 @@
 -- the oldest bracket. Confirm IVPMAINT retention before phase 2.
 -- ====================================================================
 
-INSERT INTO OBJECT/IVPRPCCTL
+INSERT INTO OBJECT.IVPRPCCTL
         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
          RPCELGMO, RPCHORIZ, RPCEXPCY,
          RPCCNOYN, RPCAUTACT,
@@ -127,7 +127,7 @@ VALUES
 -- placeholder: the AS400 catalogue -> catalogue group mapping still
 -- has to come from Content, so no real DIVCAT is seeded here.
 -- ------------------------------------------------------------------
--- INSERT INTO OBJECT/IVPRPCCTL
+-- INSERT INTO OBJECT.IVPRPCCTL
 --         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
 --          RPCELGMO, RPCHORIZ, RPCEXPCY,
 --          RPCCNOYN, RPCAUTACT,

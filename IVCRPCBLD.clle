@@ -10,7 +10,7 @@
 /* source lives (SOURCE/QRPGLESRC in each listing):                     */
 /*   DDS   ->  SOURCE/QDDSSRC                                          */
 /*   RPG   ->  SOURCE/QRPGLESRC                                        */
-/*   CL    ->  SOURCE/QCLSRC                                           */
+/*   CL    ->  SOURCE/QCLLESRC                                         */
 /* SOURCE must be on the library list, so that the /copy members       */
 /* (QCOPYSRC: statusds, checksec, ivrudrlitm) resolve.                 */
 /*                                                                    */
@@ -25,9 +25,12 @@
 /* The three seed scripts are run afterwards, not from here, because   */
 /* seeding is a data decision and this is an object build:             */
 /*                                                                    */
-/*   RUNSQLSTM SRCFILE(SOURCE/QSQLSRC) SRCMBR(IVPRPCCTLS)              */
-/*   RUNSQLSTM SRCFILE(SOURCE/QSQLSRC) SRCMBR(IVPRPCRULS)              */
-/*   RUNSQLSTM SRCFILE(SOURCE/QSQLSRC) SRCMBR(IVPRPCLADS)              */
+/*   RUNSQLSTM SRCSTMF('.../IVPRPCCTL_seed.sql') COMMIT(*NONE) +     */
+/*             NAMING(*SQL)                                            */
+/*   (the same for IVPRPCRUL_seed.sql and IVPRPCLAD_seed.sql)         */
+/*                                                                    */
+/* The scripts are written with SQL naming (OBJECT.IVPRPCCTL), so    */
+/* they are run with NAMING(*SQL).                                     */
 /*                                                                    */
 /* Every catalogue stays at phase 0 until a control row says otherwise,*/
 /* so building and seeding on their own change no prices.              */
@@ -61,22 +64,28 @@
 
              /* ---- programs --------------------------------------- */
              /* All three use embedded SQL, so they go through the     */
-             /* SQL precompiler rather than CRTBNDRPG.                 */
+             /* SQL precompiler rather than CRTBNDRPG. Their SQL names */
+             /* tables without a library; DFTRDBCOL(OBJECT) points     */
+             /* those at OBJECT, the same files the F-specs open, so   */
+             /* the library list at run time does not matter.          */
              CRTSQLRPGI OBJ(OBJECT/IVRRPCGEN) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCGEN) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          DFTRDBCOL(OBJECT) +
                           TEXT('Generate repricing suggestions')
              CRTSQLRPGI OBJ(OBJECT/IVRRPCAPL) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCAPL) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          DFTRDBCOL(OBJECT) +
                           TEXT('Apply and expire repricing suggestions')
              CRTSQLRPGI OBJ(OBJECT/IVRRPCWRK) SRCFILE(SOURCE/QRPGLESRC) +
                           SRCMBR(IVRRPCWRK) OBJTYPE(*PGM) +
                           COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          DFTRDBCOL(OBJECT) +
                           TEXT('Work with repricing suggestions')
 
              /* ---- monthly driver -------------------------------- */
-             CRTBNDCL   PGM(OBJECT/IVCRPCMTH) SRCFILE(SOURCE/QCLSRC) +
+             CRTBNDCL   PGM(OBJECT/IVCRPCMTH) SRCFILE(SOURCE/QCLLESRC) +
                           SRCMBR(IVCRPCMTH) +
                           TEXT('Re-run repricing monthly run')
 

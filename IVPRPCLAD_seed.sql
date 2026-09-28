@@ -13,7 +13,7 @@
 -- to an arbitrary .99 price. LADSEQ must ascend with LADPRICE.
 -- ====================================================================
 
-INSERT INTO OBJECT/IVPRPCLAD
+INSERT INTO OBJECT.IVPRPCLAD
         (LADCATG, LADSEQ, LADPRICE, LADMNTTS, LADMNTWHO)
 VALUES
   ('CHO',  10, 2.10, CURRENT TIMESTAMP, 'SEED'),
