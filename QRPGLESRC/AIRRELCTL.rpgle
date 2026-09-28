@@ -177,28 +177,44 @@
          $Prtbs = Bch@Ds.Prtbs;
          Out Lda;
 
-         // Get the shipping-document date (rolls to next business day off
-         // the DPPDAYS calendar unless the batch is Rush or Milwaukee -
-         // same rule OERSLSD applies for a manual release).
-         callp OERSDDAT(PrmSdatc);
+         // URGENT restore: Mirakl/Amazon keep AIRRELCTL's original
+         // behavior - submit OECPRTSD directly with no assigned
+         // shipping-doc date. Every other channel still gets the
+         // OERSDDAT/PLCCHKSGL date logic.
+         If Ucase(%Trim(Bch@Ds.Desc20)) = 'MIRAKL EDI'
+         or Ucase(%Trim(Bch@Ds.Desc20)) = 'AMAZON.COM NOTE';
+           WrkCommand = 'SBMJOB CMD(CALL PGM(OECPRTSD)) '
+                      + 'JOB(SDOC_'
+                      + $E#1
+                      + ') '
+                      + 'OUTQ(HP1N) '
+                      + 'JOBD(OPERATOR) '
+                      + 'MSGQ(*NONE)';
+           callp QCMDEXC(%Trim(WrkCommand):%Len(%Trim(WrkCommand)));
+         Else;
+           // Get the shipping-document date (rolls to next business day
+           // off the DPPDAYS calendar unless the batch is Rush or
+           // Milwaukee - same rule OERSLSD applies for a manual release).
+           callp OERSDDAT(PrmSdatc);
 
-         // Submit PLCCHKSGL with the ship-doc date, same as OERSLSD -
-         // PLCCHKSGL decides pick/put single-line handling and P&S-only
-         // routing before it submits OECPRTSD itself.
-         WrkCommand = 'SBMJOB CMD(CALL PGM(PLCCHKSGL) '
-                     + 'PARM('''
-                     + PrmSdatc
-                     + ''')) '
-                     + 'JOB(SDOC_'
-                     + $E#1
-                     + ') '
-                     + 'OUTQ(HP1N) '
-                     + 'JOBD(OPERATOR) '
-                     + 'DATE('
-                     + PrmSdatc
-                     + ') '
-                     + 'MSGQ(*NONE)';
-         callp QCMDEXC(%Trim(WrkCommand):%Len(%Trim(WrkCommand)));
+           // Submit PLCCHKSGL with the ship-doc date, same as OERSLSD -
+           // PLCCHKSGL decides pick/put single-line handling and P&S-
+           // only routing before it submits OECPRTSD itself.
+           WrkCommand = 'SBMJOB CMD(CALL PGM(PLCCHKSGL) '
+                      + 'PARM('''
+                      + PrmSdatc
+                      + ''')) '
+                      + 'JOB(SDOC_'
+                      + $E#1
+                      + ') '
+                      + 'OUTQ(HP1N) '
+                      + 'JOBD(OPERATOR) '
+                      + 'DATE('
+                      + PrmSdatc
+                      + ') '
+                      + 'MSGQ(*NONE)';
+           callp QCMDEXC(%Trim(WrkCommand):%Len(%Trim(WrkCommand)));
+         Endif;
        Endsr;
 
        //***********************************************************************
