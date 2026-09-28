@@ -73,6 +73,10 @@
      FMFPUSERS  IF   E           K DISK    EXTFILE('OBJECT/MFPUSERS')
      F                                     EXTDESC('OBJECT/MFPUSERS')
      F                                     PREFIX(USR_)
+      // Printed price and third-party approval (SOS-2092, SOS-2520).
+     FIVPPRTPRI IF   E           K DISK    EXTFILE('OBJECT/IVPPRTPRI')
+     F                                     EXTDESC('OBJECT/IVPPRTPRI')
+     F                                     PREFIX(PPR_)
 
       // Output Files
      FIVPMAINT  O    E           K DISK    EXTFILE('OBJECT/IVPMAINT')
@@ -123,6 +127,8 @@
      D WrkRulFnd       S              1A   Inz('N')
      D WrkOldStat      S              1A   Inz(*Blanks)
      D WrkApplied      S              1A   Inz('N')
+     D WrkDirect       S              1A   Inz('N')
+     D WrkTpaNo        S              1A   Inz('N')
      D WrkAudAct       S             20A   Inz(*Blanks)
      D WrkStsTok       S             10A   Inz(*Blanks)
      D WrkPrmItm       S              8A   Inz(*Blanks)
@@ -304,12 +310,42 @@
                Endif;
             Endif;
 
+            // Does an approved price go straight on to the item, or wait
+            // on the re-run queue for the reprint? Straight on only when
+            // the catalogue says so (RPCAPLTGT 'I'), or when it goes by
+            // the printed-price flag ('P') and the title is known to have
+            // no printed price (IVPPRTPRI.PRTPRC 'N'). Anything printed,
+            // stickered or not known waits: the copies in stock carry the
+            // old price until the new ones exist.
+            //
+            // The same record says whether the title is known not to need
+            // third-party approval (TPAPRV 'N'). Phase 2 only applies a
+            // price by itself for those - see the Select below.
+            WrkDirect = 'N';
+            WrkTpaNo  = 'N';
+            Chain (WrkSugItem) IVPPRTPRI;
+            If %Found(IVPPRTPRI);
+               If PPR_TPAPRV = 'N';
+                  WrkTpaNo = 'Y';
+               Endif;
+               If CTL_RPCAPLTGT = 'P' And PPR_PRTPRC = 'N';
+                  WrkDirect = 'Y';
+               Endif;
+            Endif;
+            If CTL_RPCAPLTGT = 'I';
+               WrkDirect = 'Y';
+            Endif;
+
             // Every open suggestion gets its correction note (CNO) the
             // first time it passes through here - which, in the monthly
             // job, is minutes after IVRRPCGEN raised it. Held rows get one
             // too: a title waiting on a pricing-authority check is exactly
             // one that must not be reprinted at the old price meanwhile.
+            //
+            // Not for a title whose price goes straight on: nothing is
+            // printed on it, so there is nothing to warn production about.
             If CTL_RPCCNOYN = 'Y' And SUG_RPCCNOFL <> 'Y'
+               And WrkDirect = 'N'
                And ( SUG_RPCSTAT = 'S' Or SUG_RPCSTAT = 'G'
                   Or SUG_RPCSTAT = 'A' Or SUG_RPCSTAT = 'O' );
                Exsr Sbr_Attach_CNO;
@@ -323,8 +359,13 @@
             When SUG_RPCSTAT = 'O';
                WrkAction = 'O';
                WrkNew72  = SUG_RPCAPP72;
+            // Phase 2 applies a suggestion with no editor involved, so
+            // only for a title known not to need third-party approval.
+            // A title that has not been checked waits for an editor like
+            // any phase 1 suggestion.
             When SUG_RPCSTAT = 'S' And WrkMode = 'M'
-                                   And CTL_RPCPHASE = '2';
+                                   And CTL_RPCPHASE = '2'
+                                   And WrkTpaNo = 'Y';
                WrkAction = 'U';
                WrkNew72  = SUG_RPCSUG72;
             When SUG_RPCSTAT = 'R';
@@ -468,7 +509,7 @@
             //      price is no longer printed on the book.
             WrkApplied = 'N';
 
-            If CTL_RPCAPLTGT = 'I';
+            If WrkDirect = 'Y';
                Exsr Sbr_Apply_Item;
             Else;
                Exsr Sbr_Stage_Queue;
@@ -479,7 +520,15 @@
             Endif;
 
             Exsr Sbr_Write_Audit;
-            Exsr Sbr_Price_CNO;
+
+            // Staged: the pending note becomes the price note for the
+            // reprint. Applied to the item: the price has already
+            // changed, so any pending note is simply removed.
+            If WrkDirect = 'Y';
+               Exsr Sbr_Release_CNO;
+            Else;
+               Exsr Sbr_Price_CNO;
+            Endif;
 
             SUG_RPCSTAT   = 'X';
             SUG_RPCAPP72  = WrkNew72;
@@ -494,9 +543,9 @@
             Endif;
 
             Select;
-            When CTL_RPCAPLTGT <> 'I' And WrkAction = 'U';
+            When WrkDirect = 'N' And WrkAction = 'U';
                SUG_RPCNOTE = 'STAGED AS RE-RUN NEW PRICE - PHASE 2';
-            When CTL_RPCAPLTGT <> 'I';
+            When WrkDirect = 'N';
                SUG_RPCNOTE = 'STAGED AS RE-RUN NEW PRICE';
             When WrkAction = 'U';
                SUG_RPCNOTE = 'APPLIED AUTOMATICALLY - PHASE 2';

@@ -52,16 +52,20 @@
 --              four lines marked "(IVRRPC)" are ever changed; editors'
 --              corrections on the same page are left alone.
 --
---   RPCAPLTGT  'Q' - an approved price is staged on the re-run queue
---              as IVPORRITM.NEWPRICE, not written to the item.
---              IVRORRNEWP treats NEWPRICE as a price change waiting for
---              the new printing: it compares it to PRICE72 and reports
---              it to production unless a CNO already carries it. While
---              the price is still printed on the book, raising PRICE72
---              before the new printing exists would put the system price
---              out of step with the cover on every copy in stock. 'I'
---              writes IVPITEMS directly and is there for a phase in
---              which that no longer matters.
+--   RPCAPLTGT  'P' - where an approved price goes is decided per
+--              title by the printed-price flag, IVPPRTPRI.PRTPRC
+--              (SOS-2092). A title known to have no printed price
+--              ('N') gets it on the item straight away; anything
+--              printed, stickered or not known has it staged on the
+--              re-run queue as NEWPRICE, to change with the reprint,
+--              which IVRORRNEWP already reports to production. With
+--              no flags loaded, 'P' behaves exactly like 'Q' (always
+--              stage), so it is safe from day one. 'I' writes every
+--              price straight to the item.
+--
+--   RPCAUTACT  'H' - a title flagged as needing third-party approval
+--              (IVPPRTPRI.TPAPRV 'Y', SOS-2520) is written held, for an
+--              editor to clear once approval is in. 'S' skips it.
 --
 --   RPCPRCUACT 'S' - supersede prices still staged in IVPORRPRCU.
 --              Decided 27 Sep 2026: the January 2022 load (choral and
@@ -107,16 +111,16 @@
 INSERT INTO OBJECT/IVPRPCCTL
         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
          RPCELGMO, RPCHORIZ, RPCEXPCY,
-         RPCCNOYN, RPCAUTCOD, RPCAUTACT,
+         RPCCNOYN, RPCAUTACT,
          RPCSTSLST, RPCSTSEXC, RPCFLDLST, RPCNOCHDT, RPCP112YN,
          RPCAPLTGT, RPCPRCUACT, RPCMNTTS, RPCMNTWHO)
 VALUES
   (0, '     ', '0', 'B', 'S',
    18, 6, 3,
-   'Y', '   ', 'H',
+   'Y', 'H',
    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
    DATE('1900-01-01'), 'Y',
-   'Q', 'S', CURRENT TIMESTAMP, 'SEED');
+   'P', 'S', CURRENT TIMESTAMP, 'SEED');
 
 -- ------------------------------------------------------------------
 -- Example of opting one catalogue in to phase 1. DIVCAT is a
@@ -126,13 +130,13 @@ VALUES
 -- INSERT INTO OBJECT/IVPRPCCTL
 --         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
 --          RPCELGMO, RPCHORIZ, RPCEXPCY,
---          RPCCNOYN, RPCAUTCOD, RPCAUTACT,
+--          RPCCNOYN, RPCAUTACT,
 --          RPCSTSLST, RPCSTSEXC, RPCFLDLST, RPCNOCHDT, RPCP112YN,
 --          RPCAPLTGT, RPCPRCUACT, RPCMNTTS, RPCMNTWHO)
 -- VALUES
 --   (9999999, 'CHO', '1', 'P', 'S',
 --    18, 6, 3,
---    'Y', '   ', 'H',
+--    'Y', 'H',
 --    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
 --    DATE('1900-01-01'), 'Y',
---    'Q', 'S', CURRENT TIMESTAMP, 'SEED');
+--    'P', 'S', CURRENT TIMESTAMP, 'SEED');

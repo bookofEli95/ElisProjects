@@ -18,9 +18,9 @@
 /* programs name their files EXTFILE('OBJECT/...') the way P1VBTCHUP   */
 /* does. Building straight into OBJECT is safe because every object    */
 /* here is new - confirm first that DSPOBJD OBJECT/IVPRPC*, IVRRPC*,   */
-/* IVVRPCWRK and IVCRPC* find nothing - and because the seeded control */
-/* row leaves every catalogue at phase 0, so nothing runs until one is */
-/* opted in.                                                           */
+/* IVVRPCWRK, IVPPRTPRI and IVCRPC* find nothing - and because the     */
+/* seeded control row leaves every catalogue at phase 0, so nothing    */
+/* runs until one is opted in.                                         */
 /*                                                                    */
 /* The three seed scripts are run afterwards, not from here, because   */
 /* seeding is a data decision and this is an object build:             */
@@ -50,6 +50,9 @@
              CRTLF      FILE(OBJECT/IVPRPCSG1) SRCFILE(SOURCE/QDDSSRC) +
                           SRCMBR(IVPRPCSG1) +
                           TEXT('Repricing suggestions by catalogue')
+             CRTPF      FILE(OBJECT/IVPPRTPRI) SRCFILE(SOURCE/QDDSSRC) +
+                          SRCMBR(IVPPRTPRI) +
+                          TEXT('Item printed price and approval')
 
              /* ---- display file ----------------------------------- */
              CRTDSPF    FILE(OBJECT/IVVRPCWRK) SRCFILE(SOURCE/QDDSSRC) +

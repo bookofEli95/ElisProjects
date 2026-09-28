@@ -28,6 +28,54 @@ prices from the back of books: SOS-2092 (a field saying whether a product has a
 printed price), SOS-2520 (a field saying whether a price change needs third-party
 approval) and BS-1572 (changes to ISBN and QR code generation).
 
+## Printed price and third-party approval (SOS-2092, SOS-2520)
+
+Both flags live in one new file, **`IVPPRTPRI`**, keyed by item — the file Kyle
+Swanson proposed on SOS-2092, with the SOS-2520 flag added because that ticket
+asks for the two to be combined. Not new fields on `IVPITEMS`: that would mean
+recompiling every program that uses it, and the `SYNC_IVPITEMS` triggers copy
+that record to another system.
+
+| Field | Values |
+| --- | --- |
+| `PRTPRC` printed price | `Y` yes, `N` no, `S` stickered on receipt, blank not known (Brent Halverson's four values) |
+| `TPAPRV` third-party approval | `Y` needed, `N` not needed, blank not known |
+
+**No row means not known**, the same as blank, so nothing has to be loaded for
+items nobody has checked.
+
+What the repricing process does with them:
+
+- **Printed price** (`RPCAPLTGT 'P'`, now the seed). `N` — no printed price — and
+  the approved price goes straight onto the item, with no correction note, because
+  there is nothing printed to be wrong. `Y`, `S` or not known, and it is staged for
+  the reprint as before. With no flags loaded, `'P'` behaves exactly like staging
+  always, so it is safe from the start.
+- **Third-party approval.** `Y` and the suggestion is written held, *"THIRD-PARTY
+  APPROVAL NEEDED BEFORE THE PRICE CAN CHANGE"*, for an editor to clear once
+  approval is in (`RPCAUTACT 'H'`; `'S'` skips the title instead). And **phase 2
+  only applies a price by itself when the title is known not to need approval**
+  (`N`). A title nobody has checked waits for an editor, even in phase 2.
+
+This replaces the item-code hook written before the ticket gave a field
+(`RPCAUTCOD` is gone).
+
+Still to build, once decided:
+
+1. **Filling the file.** Brent's rule: US print items `Y`/`N` from the database and
+   print spec files, everything else blank. Needs the print spec files identified.
+   Third-party approval needs a list of titles from the business — nobody can derive
+   it from AS400 data yet.
+2. **New items (PCR).** Brent notes PCR has to set the printed-price flag. For the
+   batch upload that is `P1VBTCHUP`, which would need the value from its CSV.
+3. **Where people maintain it.** Kyle suggests the RRN (online re-run) page. Changes
+   should write `IVPMAINT` rows under `PRTPRC` / `TPAPRV`, like every other item
+   field.
+4. **Repricing outside the re-run window.** A title with no printed price can be
+   repriced at any time — the reason for removing prices from books. Today the
+   generator only looks at titles due for a reprint; a second source of candidates
+   (unprinted titles not repriced in N months) is the natural next step.
+
 ## What was added
 
 | Object | Kind | Purpose |
@@ -37,6 +85,7 @@ approval) and BS-1572 (changes to ISBN and QR code generation).
 | `IVPRPCLAD` | PF | Price ladder rungs (Choral octavos) |
 | `IVPRPCSUG` | PF | One suggestion per item per cycle, with its full audit |
 | `IVPRPCSG1` | LF | Suggestions by catalogue and status — the editor queue and report path |
+| `IVPPRTPRI` | PF | Printed price and third-party approval per item (SOS-2092, SOS-2520) |
 | `IVVRPCWRK` | DSPF | Work with Repricing Suggestions |
 | `IVRRPCGEN` | RPGLE | Generates suggestions |
 | `IVRRPCWRK` | RPGLE | Editor approves, overrides or rejects |
@@ -304,9 +353,9 @@ for the queue row at approval time, not just at generation.
 - **Eligibility.** A title repriced within `RPCELGMO` months is left alone.
 - **Caps.** `RULCAPPCT` and `RULCAPAMT` limit the rise; the budget floor may
   lift a price back above a cap, which the source explicitly allows.
-- **Pricing authority.** Titles under a third-party agreement are held or
-  skipped (`RPCAUTCOD` / `RPCAUTACT`). See the open items — the AS400 field that
-  identifies them is not yet confirmed, so this is a hook, not a finished check.
+- **Third-party approval.** Titles flagged `IVPPRTPRI.TPAPRV 'Y'` are held or
+  skipped (`RPCAUTACT`), and phase 2 never applies a price by itself unless the
+  flag is `N`. See *Printed price and third-party approval*.
 - **Overrides.** An override below the current price is refused outright. An
   override past the cap is held at status `G` and needs a second, deliberate
   action to authorise, recorded against the editor. The guardrail is advisory,

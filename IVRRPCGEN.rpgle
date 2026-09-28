@@ -55,6 +55,10 @@
      FIVPORRPRCUIF   E           K DISK    EXTFILE('OBJECT/IVPORRPRCU')
      F                                     EXTDESC('OBJECT/IVPORRPRCU')
      F                                     PREFIX(PRU_)
+      // Printed price and third-party approval (SOS-2092, SOS-2520).
+     FIVPPRTPRI IF   E           K DISK    EXTFILE('OBJECT/IVPPRTPRI')
+     F                                     EXTDESC('OBJECT/IVPPRTPRI')
+     F                                     PREFIX(PPR_)
 
       // Update / Add Files
      FIVPRPCSUG UF A E           K DISK    EXTFILE('OBJECT/IVPRPCSUG')
@@ -149,9 +153,9 @@
      D WrkCapFl        S              1A   Inz('N')
      D WrkFlrFl        S              1A   Inz('N')
      D WrkAuthHld      S              1A   Inz('N')
+     D WrkDirect       S              1A   Inz('N')
      D WrkRulIdx       S              5S 0 Inz(0)
      D WrkIdx          S              5S 0 Inz(0)
-     D WrkCount        S             10I 0 Inz(0)
      D WrkOpen         S             10I 0 Inz(0)
      D WrkPhase        S              1A   Inz(*Blanks)
      D WrkNote         S             60A   Inz(*Blanks)
@@ -535,13 +539,28 @@
                Endif;
             Endif;
 
-            // 3b. When approved prices are staged on the re-run queue
-            //     (RPCAPLTGT 'Q'), a title with no queue row - one that
-            //     came from RERUN8 alone - has nowhere for its price to
-            //     wait, so a suggestion would be a dead end at approval.
-            //     RERUN8 still earns its place: for a title on both, its
-            //     date can be the earlier.
-            If CTL_RPCAPLTGT <> 'I' And WrkQueRow = 'N';
+            // 3b. Will an approved price be staged on the re-run queue, or
+            //     go straight on to the item? Straight on only when the
+            //     catalogue says so (RPCAPLTGT 'I'), or when it goes by
+            //     the printed-price flag ('P') and the title is known to
+            //     have no printed price - IVRRPCAPL makes the same call.
+            //
+            //     A title that will be staged but has no queue row - one
+            //     that came from RERUN8 alone - has nowhere for its price
+            //     to wait, so a suggestion would be a dead end. RERUN8
+            //     still earns its place: for a title on both, its date
+            //     can be the earlier.
+            WrkDirect = 'N';
+            If CTL_RPCAPLTGT = 'I';
+               WrkDirect = 'Y';
+            Endif;
+            If CTL_RPCAPLTGT = 'P';
+               Chain (WrkCndItem) IVPPRTPRI;
+               If %Found(IVPPRTPRI) And PPR_PRTPRC = 'N';
+                  WrkDirect = 'Y';
+               Endif;
+            Endif;
+            If WrkDirect = 'N' And WrkQueRow = 'N';
                WrkCntNoQue += 1;
                Leavesr;
             Endif;
@@ -624,15 +643,13 @@
                Leavesr;
             Endif;
 
-            // 10. Pricing authority. A title we may not be free to
-            //     reprice under a third party agreement is either held
-            //     for review or passed over, per the control row.
-            If CTL_RPCAUTCOD <> *Blanks;
-               Exsr Sbr_Check_Authority;
-               If WrkAuthHld = 'S';
-                  WrkCntAuth += 1;
-                  Leavesr;
-               Endif;
+            // 10. Third-party approval. A title whose price we may not
+            //     change without a third party's agreement is held for
+            //     review or passed over, per the control row.
+            Exsr Sbr_Check_Authority;
+            If WrkAuthHld = 'S';
+               WrkCntAuth += 1;
+               Leavesr;
             Endif;
 
             // 11. Match a rule, then do the arithmetic
@@ -746,21 +763,16 @@
       /free
          Begsr Sbr_Check_Authority;
 
-            // Which marker identifies a title whose price we are not
-            // free to raise is control data (RPCAUTCOD), because the
-            // field that carries it in AS400 is not yet confirmed. An
-            // item code is used as the hook since that is the only
-            // per-item marker of this kind in use. Blank disables the
-            // check, and RPCAUTACT decides between passing the title
-            // over ('S') and holding a suggestion for review ('H').
-            WrkCount = 0;
-            Exec SQL
-               SELECT COUNT(*) INTO :WrkCount
-                 FROM IVPITMCODE
-                WHERE ITMNUM = :WrkCndItem
-                  AND ITMCODE = :CTL_RPCAUTCOD;
-
-            If WrkCount > 0;
+            // IVPPRTPRI.TPAPRV 'Y' marks a title whose price change needs
+            // a third party's approval first (SOS-2520). Blank or no row
+            // means not known, which is the state of nearly every title
+            // until the flag is populated. It does not hold a suggestion:
+            // in phase 1 an editor approves every price anyway, and in
+            // phase 2 IVRRPCAPL only applies a price by itself when the
+            // title is known not to need approval (TPAPRV 'N').
+            WrkAuthHld = 'N';
+            Chain (WrkCndItem) IVPPRTPRI;
+            If %Found(IVPPRTPRI) And PPR_TPAPRV = 'Y';
                If CTL_RPCAUTACT = 'S';
                   WrkAuthHld = 'S';
                Else;
@@ -971,7 +983,8 @@
             // as a matter of routine.
             If WrkAuthHld = 'H';
                SUG_RPCSTAT = 'G';
-               SUG_RPCNOTE = 'PRICING AUTHORITY CHECK REQUIRED';
+               SUG_RPCNOTE = 'THIRD-PARTY APPROVAL NEEDED BEFORE ' +
+                             'THE PRICE CAN CHANGE';
             Else;
                SUG_RPCSTAT = 'S';
                SUG_RPCNOTE = RulText(WrkRulIdx);
