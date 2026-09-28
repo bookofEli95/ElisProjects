@@ -1,9 +1,9 @@
 -- OEPEDTSWP_SEED
--- Seed rows for the AIRRELSWP control file (OEPEDTSWP).
+-- Seed rows for AIRRELCTL's control-file-driven channel list (OEPEDTSWP).
 --
--- These two rows reproduce AIRRELCTL's current hardcoded channel list
--- (Mirakl EDI and Amazon.com Note) so that switching AICCRTORD from
--- AIRRELCTL to AIRRELSWP is behavior-neutral on day one.
+-- The first two rows reproduce AIRRELCTL's old hardcoded IN-list (Mirakl
+-- EDI and Amazon.com Note). The rest are the additional "pure stamping"
+-- channels named in the ticket for options 7/8.
 --
 -- To add a channel later: INSERT one row with ACTIVE = 'Y'.
 -- To stop sweeping a channel: UPDATE its row to ACTIVE = 'N' (or delete it).
@@ -15,3 +15,42 @@ INSERT INTO OEPEDTSWP (DESC, ACTIVE)
 
 INSERT INTO OEPEDTSWP (DESC, ACTIVE)
   VALUES ('AMAZON.COM NOTE', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('MUSIC SALES ORDERS', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('SMD.COM APP ORDERS', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('HL DGT BOOKS ORDERS', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('MUSIC SALES CREDIT', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('ARRANGEME DGT ORDERS', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('DIGITAL RTL ORDERS', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('DIGITAL RTL CREDIT', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('MD CONSUMER ORDERS', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('HL DGT BOOKS CREDIT', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('MODERN DRUMMER', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('ARRANGEME DGT CREDIT', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('MUSIC DIRECT ORDERS', 'Y');
+
+INSERT INTO OEPEDTSWP (DESC, ACTIVE)
+  VALUES ('TRW EDI', 'Y');
