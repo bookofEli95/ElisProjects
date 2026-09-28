@@ -181,8 +181,8 @@
          // behavior - submit OECPRTSD directly with no assigned
          // shipping-doc date. Every other channel still gets the
          // OERSDDAT/PLCCHKSGL date logic.
-         If Ucase(%Trim(Bch@Ds.Desc20)) = 'MIRAKL EDI'
-         or Ucase(%Trim(Bch@Ds.Desc20)) = 'AMAZON.COM NOTE';
+         If %Upper(%Trim(Bch@Ds.Desc20)) = 'MIRAKL EDI'
+         or %Upper(%Trim(Bch@Ds.Desc20)) = 'AMAZON.COM NOTE';
            WrkCommand = 'SBMJOB CMD(CALL PGM(OECPRTSD)) '
                       + 'JOB(SDOC_'
                       + $E#1
