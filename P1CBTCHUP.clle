@@ -29,8 +29,10 @@
 
              /* 2. Upload the CSV into the staging table */
              CPYFRMIMPF FROMSTMF(&PATHT) TOFILE(OBJECT/PCRSTAGE) +
-                          MBROPT(*ADD) RCDDLM(*CRLF) STRDLM(*DBLQUOTE) +
-                          FLDDLM(',') RPLNULLVAL(*FLDDFT) ERRLVL(*NOMAX)
+                          MBROPT(*REPLACE) FROMCCSID(1208) TOCCSID(*FILE) +
+                          RCDDLM(*CRLF) DTAFMT(*DLM) STRDLM('"') +
+                          FLDDLM(',') FROMRCD(4) ERRLVL(*NOMAX) +
+                          RPLNULLVAL(*FLDDFT) RMVBLANK(*BOTH)
 
              /* 3. Call the RPGLE batch processing program */
              CALL       PGM(OBJECT/P1RBTCHUP)
