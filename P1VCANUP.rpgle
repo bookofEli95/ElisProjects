@@ -25,6 +25,11 @@
      D UploadDir       S            256A
      D UploadName      S            256A
      D FullIFSPath     S            256A
+     D UpperName       S            256A
+     D NameLen         S              5I 0
+     D NameExt         S              4A
+
+      /copy qcopysrc,uplow
 
       //*****************************************************************
       // MainLine
@@ -42,6 +47,21 @@
      C                   Eval      UploadName = %Subst(UPLOADFILE : 260 : 256)
      C                   If        UploadName = *Blanks
      C                   Eval      Message = 'Please upload a CSV file first'
+     C                   Iter
+     C                   Endif
+
+      // CPYFRMIMPF can only read a delimited text file - an Excel
+      // workbook (.xlsx) makes the CL crash with a program dump
+     C                   Eval      UpperName = %Xlate(WrkLow : WrkUp :
+     C                                                UploadName)
+     C                   Eval      NameLen = %Len(%TrimR(UpperName))
+     C                   Eval      NameExt = *Blanks
+     C                   If        NameLen >= 4
+     C                   Eval      NameExt = %Subst(UpperName : NameLen - 3 : 4)
+     C                   Endif
+     C                   If        NameExt <> '.CSV'
+     C                   Eval      Message = 'Please upload a .csv file ' +
+     C                             '(Excel: Save As, CSV Comma delimited)'
      C                   Iter
      C                   Endif
 
