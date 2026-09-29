@@ -28,25 +28,6 @@
       /copy qcopysrc,odrbldtype
       /copy qcopysrc,oerrelas
 
-       Dcl-PR OERSDDAT ExtPgm('OERSDDAT');
-         PrmSdatc Char(6);
-       End-PR;
-
-       // Writes one free-text line to the job log (CPF9898 is IBM's
-       // generic "send this text as-is" message - no custom message
-       // file needed).
-       Dcl-PR QMHSNDPM ExtPgm('QMHSNDPM');
-         MsgID       Char(7)   Const;
-         QualMsgF    Char(20)  Const;
-         MsgDta      Char(132) Const;
-         MsgDtaLen   Int(10)   Const;
-         MsgType     Char(10)  Const;
-         CallStkEnt  Char(10)  Const;
-         CallStkCnt  Int(10)   Const;
-         MsgKey      Char(4);
-         ErrorCode   Char(8)   Const;
-       End-PR;
-
        //***********************************************************************
        //* Entry Parameters *
        //********************
@@ -68,40 +49,25 @@
      D  $D                   545    744
      D                                     DIM(10)
 
+     D*PrmSdatc        S              6A
+     D*WrkSddtea       S              6A
      D PrmOrdnum       S              8A
-     D PrmSdatc        S              6A
-     D WrkPickPut      S              1A
-     D WrkOrig         S              1A
-     D WrkPlpFnd       S              1A
      D WrkCommand      S           1024A
-
-     D WrkMsgTxt       S            132A
-     D WrkMsgKey       S              4A
-     D WrkErrCde       S              8A   Inz(x'0000000000000000')
-     D WrkOrdCnt       S              5  0
-     D WrkTotBch       S              5  0 Inz(0)
-     D WrkTotOrd       S              7  0 Inz(0)
 
        //***********************************************************************
        //* Main Line *
        //*************
        Exec Sql Set Option Commit=*None, CloSqlCsr=*EndMod;
 
-       // IN (subquery) rather than a join, so a duplicate control row can
-       // never return the same batch twice. Mirakl/Amazon keep the
-       // original AIRRELCTL selection (no BCHSTS filter).
        Exec Sql declare cur_Bch cursor for
-            select b.*
-              from oepbchk b
-                where b.edtb# <> 0
-                  and ucase(rtrim(b.desc20)) in
-                      (select ucase(rtrim(s.desc))
-                         from oepedtswp s
-                        where s.active = 'Y')
-                  and (b.bchsts <> 'C'
-                       or ucase(b.desc20) in ('MIRAKL EDI',
-                                              'AMAZON.COM NOTE'))
-            order by b.edtb#;
+            select *
+              from oepbchk
+                where edtb# <> 0
+                  and ucase(desc20) in (
+                                        'MIRAKL EDI',
+                                        'AMAZON.COM NOTE'
+                                        )
+            order by edtb#;
 
        Exec Sql Open cur_Bch;
        If Sqlcode < 0;
@@ -112,30 +78,12 @@
 
        Dow SqlCod = 0;
 
-         WrkOrig = 'N';
-         If %Upper(%Trim(Bch@Ds.Desc20)) = 'MIRAKL EDI'
-         or %Upper(%Trim(Bch@Ds.Desc20)) = 'AMAZON.COM NOTE';
-           WrkOrig = 'Y';
-         Endif;
-
          Exsr Sbr_Credit_Release;
          Exsr Sbr_Order_History;
          Exsr Sbr_Shipping_Doc;
 
-         WrkTotBch += 1;
-         WrkTotOrd += WrkOrdCnt;
-         WrkMsgTxt = 'AIRRELCTL released Edtb# ' + %Char(Bch@Ds.Edtb#)
-                   + ' Keyb# ' + %Char(Bch@Ds.Keyb#)
-                   + ' Desc ' + %Trim(Bch@Ds.Desc20)
-                   + ' Orders ' + %Char(WrkOrdCnt);
-         Exsr Sbr_Log;
-
          Exec Sql Fetch cur_Bch Into :Bch@Ds;
        Enddo;
-
-       WrkMsgTxt = 'AIRRELCTL run total - Batches ' + %Char(WrkTotBch)
-                 + ' Orders ' + %Char(WrkTotOrd);
-       Exsr Sbr_Log;
 
        *InLR = *On;
 
@@ -146,15 +94,6 @@
        // /****************************************************************\ *
        //< SUBROUTINES >*
        // \****************************************************************/ *
-
-       //***********************************************************************
-       //* Write one line to the job log
-       //******************
-       Begsr Sbr_Log;
-         Callp QMHSNDPM('CPF9898':'QCPFMSG   *LIBL':WrkMsgTxt:
-                         %Len(%Trimr(WrkMsgTxt)):'*INFO':'*':0:
-                         WrkMsgKey:WrkErrCde);
-       Endsr;
 
        //***********************************************************************
        //* Credit Release for Shipping
@@ -191,51 +130,24 @@
          $Prtbs = Bch@Ds.Prtbs;
          Out Lda;
 
-         // URGENT restore: Mirakl/Amazon keep AIRRELCTL's original
-         // behavior - submit OECPRTSD directly with no assigned
-         // shipping-doc date. Every other channel still gets the
-         // OERSDDAT/PLCCHKSGL date logic.
-         If WrkOrig = 'Y';
-           WrkCommand = 'SBMJOB CMD(CALL PGM(OECPRTSD)) '
-                      + 'JOB(SDOC_'
-                      + $E#1
-                      + ') '
-                      + 'OUTQ(HP1N) '
-                      + 'JOBD(OPERATOR) '
-                      + 'MSGQ(*NONE)';
-           callp QCMDEXC(%Trim(WrkCommand):%Len(%Trim(WrkCommand)));
-         Else;
-           // Get the shipping-document date (rolls to next business day
-           // off the DPPDAYS calendar unless the batch is Rush or
-           // Milwaukee - same rule OERSLSD applies for a manual release).
-           callp OERSDDAT(PrmSdatc);
+         // Enable these codes if release date needs to be next day
+         // callp OERSDDAT(PrmSdatc);
+         // WrkSddtea = PrmSdatc;
 
-           // Submit PLCCHKSGL with the ship-doc date, same as OERSLSD -
-           // PLCCHKSGL decides pick/put single-line handling and P&S-
-           // only routing before it submits OECPRTSD itself.
-           WrkCommand = 'SBMJOB CMD(CALL PGM(PLCCHKSGL) '
-                      + 'PARM('''
-                      + PrmSdatc
-                      + ''')) '
-                      + 'JOB(SDOC_'
-                      + $E#1
-                      + ') '
-                      + 'OUTQ(HP1N) '
-                      + 'JOBD(OPERATOR) '
-                      + 'DATE('
-                      + PrmSdatc
-                      + ') '
-                      + 'MSGQ(*NONE)';
-           callp QCMDEXC(%Trim(WrkCommand):%Len(%Trim(WrkCommand)));
-         Endif;
+         WrkCommand = 'SBMJOB CMD(CALL PGM(OECPRTSD)) '
+                    + 'JOB(SDOC_'
+                    + $E#1
+                    + ') '
+                    + 'OUTQ(HP1N) '
+                    + 'JOBD(OPERATOR) '
+                    + 'MSGQ(*NONE)';
+         callp QCMDEXC(%Trim(WrkCommand):%Len(%Trim(WrkCommand)));
        Endsr;
 
        //***********************************************************************
        //* Generate Order History
        //******************
        Begsr Sbr_Order_History;
-
-         WrkOrdCnt = 0;
 
          Exec Sql declare cur_Trk cursor for
               select Ordnum,
@@ -267,41 +179,12 @@
            Hst@Ds.Edtb#   = Trk@Ds.Edtb#;
            Hst@Ds.EdtDesc = Bch@Ds.Desc20;
            Hst@Ds.StsDate = %Dec(%Date():*USA);
-
-           // Same Ordsts/PickMthd rules OERSLSD applies on a manual release -
-           // a batch-description override in PLPEBDESC wins, otherwise fall
-           // back to the order's phone code.
-           // Mirakl/Amazon skip the PLPEBDESC lookup - original AIRRELCTL
-           // used the phone code only.
-           WrkPickPut = *Blanks;
-           WrkPlpFnd = 'N';
-           If WrkOrig = 'N';
-             Exec Sql
-               select PickPut into :WrkPickPut
-                 from PLPEBDESC
-                   where Desc20 = :Bch@Ds.Desc20
-                   fetch first row only;
-             If Sqlcode = 0;
-               WrkPlpFnd = 'Y';
-             Endif;
-           Endif;
-
-           If WrkPlpFnd = 'Y';
-             If WrkPickPut = 'K';
-               Hst@Ds.Ordsts   = 'W';
-               Hst@Ds.PickMthd = 'T'; // Change to PUT
-             Elseif WrkPickPut = 'T';
-               Hst@Ds.Ordsts   = 'W';
-               Hst@Ds.PickMthd = 'T';
-             Endif;
+           If Trk@Ds.Phoncd = 'R';
+             Hst@Ds.Ordsts   = 'W';
+             Hst@Ds.PickMthd = 'R';
            Else;
-             If Trk@Ds.Phoncd = 'R';
-               Hst@Ds.Ordsts   = 'W';
-               Hst@Ds.PickMthd = 'R';
-             Else;
-               Hst@Ds.Ordsts   = 'W';
-               Hst@Ds.PickMthd = 'M';
-             Endif;
+             Hst@Ds.Ordsts   = 'W';
+             Hst@Ds.PickMthd = 'M';
            Endif;
 
            Exec Sql
@@ -311,7 +194,6 @@
            //...Call ODRBLDTYPE to type all orders in batch
            PrmOrdnum = %Editc(Trk@Ds.Ordnum:'X');
            Callp ODRBLDTYPE(PrmOrdNum);
-           WrkOrdCnt += 1;
 
            Exec Sql Fetch cur_Trk Into :Trk@Ds.Ordnum,
                                        :Trk@Ds.Keyb#,
