@@ -20,7 +20,7 @@
       // Variables
       //*****************************************************************
       // Must match the upload widget's target directory on P1DCANUP
-     D UploadDir       C                   '/home/ELIASI/'
+     D UploadDir       C                   '/Uploads/EliTest/'
      D FullIFSPath     S            256A
 
       //*****************************************************************
