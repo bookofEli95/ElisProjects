@@ -19,8 +19,11 @@
       //*****************************************************************
       // Variables
       //*****************************************************************
-      // Must match the upload widget's target directory on P1DCANUP
-     D UploadDir       C                   '/Uploads/EliTest/'
+      // UPLOADFILE is the upload widget's "upload response": a 3-digit
+      // file count, the 256-byte target directory, then a 256-byte name
+      // per uploaded file. Only the first uploaded file is processed.
+     D UploadDir       S            256A
+     D UploadName      S            256A
      D FullIFSPath     S            256A
 
       //*****************************************************************
@@ -28,17 +31,29 @@
       //*****************************************************************
      C                   Dow       1=1
      C                   Exfmt     ADD
+     C                   Eval      Message = *Blanks
 
-     C                   If        btnUpload = *On
-     C                   Eval      FullIFSPath = UploadDir +
-     C                                           %Trim(UPLOADFILE)
+     C                   If        BtnExit = *On
+     C                   Leave
+     C                   Endif
+
+     C                   If        BtnUpload = *On
+     C                   Eval      UploadDir  = %Subst(UPLOADFILE : 4 : 256)
+     C                   Eval      UploadName = %Subst(UPLOADFILE : 260 : 256)
+     C                   If        UploadName = *Blanks
+     C                   Eval      Message = 'Please upload a CSV file first'
+     C                   Iter
+     C                   Endif
+
+     C                   Eval      FullIFSPath = %TrimR(UploadDir) + '/' +
+     C                                           %Trim(UploadName)
      C                   Call(E)   'P1CCANCL2'
      C                   Parm                    FullIFSPath
-      // On failure P1CCANCL2 has cleared PCRCANSTG and logged the
-      // reason in the job log; stay on the screen so the user can retry
      C                   If        Not %Error
      C                   Leave
      C                   Endif
+     C                   Eval      Message = 'Close failed - check the file ' +
+     C                                       'and try again'
      C                   Endif
 
      C                   Enddo
