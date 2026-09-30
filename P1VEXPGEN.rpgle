@@ -25,6 +25,7 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
+       // H33975  09/30/26 EFI Show Closed/Cancelled and POP on PCR
        // FIX     09/30/26 EFI Quick Fix - Auomate Release
        // H33111  08/02/24 TAK PCR program repeatedly writing a SELLBL MNT recor
        //                      d.
@@ -190,6 +191,7 @@
       /copy qcopysrc,p1remltpc
       /copy qcopysrc,p1rbhismn
       /copy qcopysrc,p1rapprkit
+      /copy qcopysrc,p1rcansts
 
       /copy qcopysrc,p1vprint
       /copy qcopysrc,p1vchppl
@@ -3448,6 +3450,9 @@
                              : Scn_CancelDate
                              : Scn_CancelUser);
           Endif;
+
+          // Closed or Cancelled, and whether the item was POP'd
+          Callp P1RCANSTS(Scn_Itmnum : Scn_Jobnum7 : Scn_CancelLbl);
 
           Chain(n) (Scn_Itmnum : Scn_Jobnum7) PCLMAIN08;
           If Pcd_Inquiry <> ' '
