@@ -3453,6 +3453,8 @@
 
           // Closed or Cancelled, and whether the item was POP'd
           Callp P1RCANSTS(Scn_Itmnum : Scn_Jobnum7 : Scn_CancelLbl);
+          // Portal labels have no dot leaders, e.g. 'Closed/POP'
+          Scn_CancelLbl = %Trim(%Xlate('.:' : '  ' : Scn_CancelLbl));
 
           Chain(n) (Scn_Itmnum : Scn_Jobnum7) PCLMAIN08;
           If Pcd_Inquiry <> ' '
