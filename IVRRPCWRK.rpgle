@@ -229,8 +229,19 @@
                      SNEW = 0;
                   Endif;
 
-                  SDUE  = SUG_RPCDUEDT;
-                  SLSTC = SUG_RPCLSTCHG;
+                  // Shown as MM/DD/YY text. The no-change placeholder
+                  // (1900-01-01) is outside what MM/DD/YY can hold, and
+                  // would end the program, so it shows as 'none'.
+                  SDUE  = *Blanks;
+                  If SUG_RPCDUEDT >= D'1940-01-01'
+                     And SUG_RPCDUEDT <= D'2039-12-31';
+                     SDUE = %Char(SUG_RPCDUEDT : *MDY/);
+                  Endif;
+                  SLSTC = 'none';
+                  If SUG_RPCLSTCHG >= D'1940-01-01'
+                     And SUG_RPCLSTCHG <= D'2039-12-31';
+                     SLSTC = %Char(SUG_RPCLSTCHG : *MDY/);
+                  Endif;
                   Write RPCSFL1;
                   WrkLoaded += 1;
                Endif;

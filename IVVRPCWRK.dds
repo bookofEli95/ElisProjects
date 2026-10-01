@@ -40,10 +40,11 @@
      A            SCUR           7Y 2O  7 35EDTCDE(3)
      A            SSUG           7Y 2O  7 44EDTCDE(3)
      A            SNEW           7Y 2B  7 53EDTCDE(4)
-     A            SDUE            L  O  7 62DATFMT(*MDY)
-     A                                      DATSEP('/')
-     A            SLSTC           L  O  7 71DATFMT(*MDY)
-     A                                      DATSEP('/')
+     A* The two dates are shown as text, set by the program: a title
+     A* with no recorded price change carries 1900-01-01, which a
+     A* MM/DD/YY date field cannot hold, and shows as 'none'.
+     A            SDUE           8A  O  7 62
+     A            SLSTC          8A  O  7 71
      A*
      A*  Subfile control
      A          R RPCCTL1                   SFLCTL(RPCSFL1)
