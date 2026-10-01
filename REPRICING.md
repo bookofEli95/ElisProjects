@@ -385,10 +385,21 @@ helpers) and is switched by `RPCCNOYN`.
 ## Running it
 
 ```
-CALL OBJECT/IVCRPCMTH PARM('*CUR  ' '*ALL   ' '*REPORT')   /* dry run */
-CALL OBJECT/IVCRPCMTH PARM('*CUR  ' '*ALL   ' '*PROD  ')   /* monthly */
-CALL OBJECT/IVRRPCWRK                                      /* editor screen */
+CALL IVCRPCMTH PARM('*CUR  ' '*ALL   ' '*REPORT')   /* dry run */
+CALL IVCRPCMTH PARM('*CUR  ' '*ALL   ' '*PROD  ')   /* monthly */
+CALL IVRRPCWRK                                      /* editor screen */
 ```
+
+No library is named anywhere in the programs - not on their files, their SQL
+or the programs they call - so which library they use is set by the library
+list. Testing runs in **H33979**: build there with
+`CALL IVCRPCBLD PARM('H33979' 'SOURCE')`, then put H33979 ahead of OBJECT
+(`ADDLIBLE H33979 *FIRST`) before calling anything. The project's own files
+then come from H33979. Existing files that H33979 has no copy of (IVPITEMS,
+IVPORRITM, RERUN8, IVPMAINT, NOTEPADI, ...) still come from OBJECT, which is
+harmless for a dry run and the screen - neither writes to them - but means a
+`*PROD` run from H33979 would change production data. Once confirmed, the
+same source is built into OBJECT with `PARM('OBJECT' 'SOURCE')`.
 
 Report mode writes nothing and attaches no CNO, so a catalogue can be shown what
 it would be told before it is opened in to phase 1.

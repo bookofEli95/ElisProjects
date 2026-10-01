@@ -49,41 +49,35 @@
       // RPCSUG  09/21/26 EFI Create re-run repricing apply and expire
       //**********************************************************************
 
+      // Files are opened through the library list, with no library
+      // named, so the same program reads a test library when that is
+      // ahead of OBJECT in the list, and OBJECT in production.
+
       // Input Files
-     FIVPRPCCTL IF   E           K DISK    EXTFILE('OBJECT/IVPRPCCTL')
-     F                                     EXTDESC('OBJECT/IVPRPCCTL')
+     FIVPRPCCTL IF   E           K DISK
      F                                     PREFIX(CTL_)
-     FIVPRPCRUL IF   E           K DISK    EXTFILE('OBJECT/IVPRPCRUL')
-     F                                     EXTDESC('OBJECT/IVPRPCRUL')
+     FIVPRPCRUL IF   E           K DISK
      F                                     PREFIX(RUL_)
 
       // Update / Add Files
-     FIVPRPCSUG UF A E           K DISK    EXTFILE('OBJECT/IVPRPCSUG')
-     F                                     EXTDESC('OBJECT/IVPRPCSUG')
+     FIVPRPCSUG UF A E           K DISK
      F                                     PREFIX(SUG_)
-     FIVPITEMS  UF A E           K DISK    EXTFILE('OBJECT/IVPITEMS')
-     F                                     EXTDESC('OBJECT/IVPITEMS')
+     FIVPITEMS  UF A E           K DISK
      F                                     PREFIX(ITM_)
-     FIVPORRITM UF   E           K DISK    EXTFILE('OBJECT/IVPORRITM')
-     F                                     EXTDESC('OBJECT/IVPORRITM')
+     FIVPORRITM UF   E           K DISK
      F                                     PREFIX(ORR_)
-     FNOTEPADI  UF A E           K DISK    EXTFILE('OBJECT/NOTEPADI')
-     F                                     EXTDESC('OBJECT/NOTEPADI')
+     FNOTEPADI  UF A E           K DISK
      F                                     PREFIX(NTE_)
-     FMFPUSERS  IF   E           K DISK    EXTFILE('OBJECT/MFPUSERS')
-     F                                     EXTDESC('OBJECT/MFPUSERS')
+     FMFPUSERS  IF   E           K DISK
      F                                     PREFIX(USR_)
       // Printed price and third-party approval (SOS-2092, SOS-2520).
-     FIVPPRTPRT IF   E           K DISK    EXTFILE('OBJECT/IVPPRTPRT')
-     F                                     EXTDESC('OBJECT/IVPPRTPRT')
+     FIVPPRTPRT IF   E           K DISK
      F                                     PREFIX(PPR_)
 
       // Output Files
-     FIVPMAINT  O    E           K DISK    EXTFILE('OBJECT/IVPMAINT')
-     F                                     EXTDESC('OBJECT/IVPMAINT')
+     FIVPMAINT  O    E           K DISK
      F                                     PREFIX(MNT_)
-     FIVPORRMNT O    E           K DISK    EXTFILE('OBJECT/IVPORRMNT')
-     F                                     EXTDESC('OBJECT/IVPORRMNT')
+     FIVPORRMNT O    E           K DISK
      F                                     PREFIX(ORM_)
 
       //**********************************************************************

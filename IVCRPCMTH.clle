@@ -45,22 +45,26 @@
                           CHGVAR     VAR(&WRKCYCL) VALUE(&CYCLE)
              ENDDO
 
+             /* The two programs are called through the library list,  */
+             /* like the files they open, so a test library ahead of   */
+             /* OBJECT runs its own copies against its own files.       */
+
              /* In report mode the generator writes nothing and the     */
              /* applier is not called at all, so a dry run cannot move  */
              /* a price or attach a CNO.                                */
              IF         COND(&MODE *EQ '*REPORT') THEN(DO)
                           CHGVAR     VAR(&GENMODE) VALUE('R')
-                          CALL       PGM(OBJECT/IVRRPCGEN) +
+                          CALL       PGM(IVRRPCGEN) +
                                        PARM(&WRKCYCL &DIVCAT &GENMODE)
                           SNDPGMMSG  MSG('Repricing report-only run +
                                        finished. Nothing was written.')
                           RETURN
              ENDDO
 
-             CALL       PGM(OBJECT/IVRRPCGEN) +
+             CALL       PGM(IVRRPCGEN) +
                           PARM(&WRKCYCL &DIVCAT &GENMODE)
 
-             CALL       PGM(OBJECT/IVRRPCAPL) +
+             CALL       PGM(IVRRPCAPL) +
                           PARM(&APLMODE &WRKCYCL)
 
              SNDPGMMSG  MSG('Repricing monthly run finished for cycle +

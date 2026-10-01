@@ -42,25 +42,24 @@
       // RPCSUG  09/21/26 EFI Create work with repricing suggestions
       //**********************************************************************
 
+      // Files are opened through the library list, with no library
+      // named, so the same program reads a test library when that is
+      // ahead of OBJECT in the list, and OBJECT in production.
+
       // Display File
-     FIVVRPCWRK CF   E             WORKSTN EXTFILE('OBJECT/IVVRPCWRK')
-     F                                     EXTDESC('OBJECT/IVVRPCWRK')
+     FIVVRPCWRK CF   E             WORKSTN
      F                                     SFILE(RPCSFL1:WrkRrn)
 
       // Input Files
-     FIVPRPCCTL IF   E           K DISK    EXTFILE('OBJECT/IVPRPCCTL')
-     F                                     EXTDESC('OBJECT/IVPRPCCTL')
+     FIVPRPCCTL IF   E           K DISK
      F                                     PREFIX(CTL_)
-     FIVPRPCRUL IF   E           K DISK    EXTFILE('OBJECT/IVPRPCRUL')
-     F                                     EXTDESC('OBJECT/IVPRPCRUL')
+     FIVPRPCRUL IF   E           K DISK
      F                                     PREFIX(RUL_)
-     FIVPITEMS  IF   E           K DISK    EXTFILE('OBJECT/IVPITEMS')
-     F                                     EXTDESC('OBJECT/IVPITEMS')
+     FIVPITEMS  IF   E           K DISK
      F                                     PREFIX(ITM_)
 
       // Update Files
-     FIVPRPCSUG UF A E           K DISK    EXTFILE('OBJECT/IVPRPCSUG')
-     F                                     EXTDESC('OBJECT/IVPRPCSUG')
+     FIVPRPCSUG UF A E           K DISK
      F                                     PREFIX(SUG_)
 
       //**********************************************************************

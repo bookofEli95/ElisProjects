@@ -34,40 +34,35 @@
       //                      generator
       //**********************************************************************
 
+      // Files are opened through the library list, with no library
+      // named, so the same program reads a test library when that is
+      // ahead of OBJECT in the list, and OBJECT in production.
+
       // Input Files
-     FIVPRPCCTL IF   E           K DISK    EXTFILE('OBJECT/IVPRPCCTL')
-     F                                     EXTDESC('OBJECT/IVPRPCCTL')
+     FIVPRPCCTL IF   E           K DISK
      F                                     PREFIX(CTL_)
-     FIVPRPCRUL IF   E           K DISK    EXTFILE('OBJECT/IVPRPCRUL')
-     F                                     EXTDESC('OBJECT/IVPRPCRUL')
+     FIVPRPCRUL IF   E           K DISK
      F                                     PREFIX(RUL_)
-     FIVPRPCLAD IF   E           K DISK    EXTFILE('OBJECT/IVPRPCLAD')
-     F                                     EXTDESC('OBJECT/IVPRPCLAD')
+     FIVPRPCLAD IF   E           K DISK
      F                                     PREFIX(LAD_)
-     FIVPITEMS  IF   E           K DISK    EXTFILE('OBJECT/IVPITEMS')
-     F                                     EXTDESC('OBJECT/IVPITEMS')
+     FIVPITEMS  IF   E           K DISK
      F                                     PREFIX(ITM_)
-     FIVPORRITM IF   E           K DISK    EXTFILE('OBJECT/IVPORRITM')
-     F                                     EXTDESC('OBJECT/IVPORRITM')
+     FIVPORRITM IF   E           K DISK
      F                                     PREFIX(ORR_)
       // Prices already staged for the re-run queue, which IVRORRNWPR copies
       // into NEWPRICE - see step 2c.
-     FIVPORRPRCUIF   E           K DISK    EXTFILE('OBJECT/IVPORRPRCU')
-     F                                     EXTDESC('OBJECT/IVPORRPRCU')
+     FIVPORRPRCUIF   E           K DISK
      F                                     PREFIX(PRU_)
       // Printed price and third-party approval (SOS-2092, SOS-2520).
-     FIVPPRTPRT IF   E           K DISK    EXTFILE('OBJECT/IVPPRTPRT')
-     F                                     EXTDESC('OBJECT/IVPPRTPRT')
+     FIVPPRTPRT IF   E           K DISK
      F                                     PREFIX(PPR_)
 
       // Update / Add Files
-     FIVPRPCSUG UF A E           K DISK    EXTFILE('OBJECT/IVPRPCSUG')
-     F                                     EXTDESC('OBJECT/IVPRPCSUG')
+     FIVPRPCSUG UF A E           K DISK
      F                                     PREFIX(SUG_)
 
       // Output Files
-     FIVPORRMNT O    E           K DISK    EXTFILE('OBJECT/IVPORRMNT')
-     F                                     EXTDESC('OBJECT/IVPORRMNT')
+     FIVPORRMNT O    E           K DISK
      F                                     PREFIX(ORM_)
 
       //**********************************************************************
