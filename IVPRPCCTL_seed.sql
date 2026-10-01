@@ -134,7 +134,7 @@ VALUES
 --          RPCSTSLST, RPCSTSEXC, RPCFLDLST, RPCNOCHDT, RPCP112YN,
 --          RPCAPLTGT, RPCPRCUACT, RPCMNTTS, RPCMNTWHO)
 -- VALUES
---   (9999999, 'CHO', '1', 'P', 'S',
+--   (9999999, 'CHO', '1', 'B', 'S',
 --    18, 6, 3,
 --    'Y', 'H',
 --    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
