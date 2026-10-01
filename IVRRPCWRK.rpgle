@@ -241,6 +241,12 @@
                      And SUG_RPCLSTCHG <= D'2039-12-31';
                      SLSTC = %Char(SUG_RPCLSTCHG : *MDY/);
                   Endif;
+                  // The note says which bracket the price came from, or
+                  // why the line is held - G alone does not say whether
+                  // it is waiting on a third party or on an override.
+                  SNOTE = SUG_RPCNOTE;
+                  *In31 = (SUG_RPCSTAT = 'G');
+
                   Write RPCSFL1;
                   WrkLoaded += 1;
                Endif;
