@@ -99,6 +99,7 @@
       // Suggestion key fetched from the cursor
      D WrkSugItem      S              8S 0 Inz(0)
      D WrkSugCycl      S              6S 0 Inz(0)
+     D WrkQueFnd       S              1A   Inz('N')
 
       // Run settings
      D WrkMode         S              1A   Inz('A')
@@ -557,15 +558,17 @@
 
             WrkAudAct = 'Reprice staged';
 
-            // Read for update: this row is the one being written.
-            Chain (WrkSugItem) IVPORRITM;
+            // Read for update: this row is the one being written. By
+            // both key fields - the item has a row per re-run, and the
+            // suggestion records which one it was raised against.
+            Exsr Sbr_Chain_Queue;
 
             // No queue row, so nowhere for a pending price to wait. The
             // row can go between suggestion and approval - IVRORRCLN's
             // satellites show items leave the queue routinely - so this
             // is checked here even though IVRRPCGEN will not raise a
             // suggestion for an item without one.
-            If Not %Found(IVPORRITM);
+            If WrkQueFnd = 'N';
                WrkNote = 'NO RE-RUN QUEUE ROW TO CARRY THE NEW PRICE';
                Exsr Sbr_Reject;
                WrkCntNoQue += 1;
@@ -1051,8 +1054,8 @@
             // IVPORRITM.CNO is set to 'M' only if it was blank, as IVRICNO
             // and IVRCNOUPD do. RPCCNOSET records that it was this process
             // that set it, so that it only ever clears a flag it set.
-            Chain (WrkSugItem) IVPORRITM;
-            If %Found(IVPORRITM);
+            Exsr Sbr_Chain_Queue;
+            If WrkQueFnd = 'Y';
                If ORR_CNO = *Blanks;
                   ORR_CNO = 'M';
                   Update IV$ORRITM %Fields(ORR_CNO);
@@ -1111,8 +1114,8 @@
                Endif;
 
                If SUG_RPCCNOSET = 'Y';
-                  Chain (WrkSugItem) IVPORRITM;
-                  If %Found(IVPORRITM);
+                  Exsr Sbr_Chain_Queue;
+                  If WrkQueFnd = 'Y';
                      If ORR_CNO = 'M';
                         ORR_CNO = ' ';
                         Update IV$ORRITM %Fields(ORR_CNO);
@@ -1120,6 +1123,28 @@
                         Unlock IVPORRITM;
                      Endif;
                   Endif;
+               Endif;
+            Endif;
+
+         Endsr;
+      /end-free
+
+      //***********************************************************************
+      //* Subroutine: Read this suggestion's re-run queue row, for update
+      //***********************************************************************
+      /free
+         Begsr Sbr_Chain_Queue;
+
+            // IVPORRITM keeps a row per item per re-run, keyed ITMNUM +
+            // MINQTYDT. The suggestion records which re-run it was raised
+            // against; by item alone the chain would land on the oldest
+            // re-run and write to history. No MINQTYDT (0001-01-01) means
+            // the title came from RERUN8 and has no queue row at all.
+            WrkQueFnd = 'N';
+            If SUG_RPCMINQDT > D'0001-01-01';
+               Chain (WrkSugItem : SUG_RPCMINQDT) IVPORRITM;
+               If %Found(IVPORRITM);
+                  WrkQueFnd = 'Y';
                Endif;
             Endif;
 

@@ -82,6 +82,12 @@
      A                                      COLHDG('RERUN' 'DUE')
      A            RPCJOB7        7S 0       TEXT('Re-run job if known')
      A                                      COLHDG('JOB' 'NUMBER')
+     A* IVPORRITM keeps one row per item per re-run, keyed ITMNUM +
+     A* MINQTYDT. This is the MINQTYDT of the row the suggestion is for,
+     A* so the price is staged on that row and no other. 0001-01-01
+     A* when the title has no queue row (it came from RERUN8 alone).
+     A            RPCMINQDT       L         TEXT('Queue row MINQTYDT')
+     A                                      COLHDG('QUEUE' 'MIN QTY' 'DATE')
      A            RPCCNOFL       1A         TEXT('CNO attached Y/N')
      A                                      COLHDG('CNO' 'FLAG')
      A            RPCCNORCD      1S 0       TEXT('NOTEPADI page of the CNO')

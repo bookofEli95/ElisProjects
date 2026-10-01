@@ -234,6 +234,13 @@ write, so it cannot undo another job's change to an unrelated field.
 
 ## What the online re-run programs settled
 
+- **IVPORRITM is keyed ITMNUM + MINQTYDT**, which the RRN marketing programs
+  (IVRORRMKT and its satellites) chain by: one row per item per re-run. The
+  generator now carries the MINQTYDT of the queue row it picked and records it on
+  the suggestion (`RPCMINQDT`), and the applier stages NEWPRICE and sets or clears
+  the CNO flag on that row only. Chained by item alone, both would have landed
+  on the item's oldest row.
+
 `IVRORRNEWP`, `IVRORRNBR`, `IVRORRIVP2` and `IVRORRCLN` changed the design in
 three places.
 

@@ -114,6 +114,7 @@
      D WrkCndItem      S              8S 0 Inz(0)
      D WrkCndDue8      S              8S 0 Inz(0)
      D WrkCndJob       S              7S 0 Inz(0)
+     D WrkCndMinQ      S               D   Inz(D'0001-01-01')
 
       // Selection settings taken from the default control row
      D WrkStsChk       S              1A   Inz('N')
@@ -229,7 +230,8 @@
          //              bounded by WrkFrom8 to keep history out.
          Exec SQL
             DECLARE CsrCand CURSOR FOR
-               SELECT CND.ITMNUM, MIN(CND.DUE8), MAX(CND.JOB7)
+               SELECT CND.ITMNUM, MIN(CND.DUE8), MAX(CND.JOB7),
+                      MAX(CND.MINQ)
                  FROM ( SELECT O.ITMNUM AS ITMNUM,
                                CASE WHEN O.ESTBODT IS NOT NULL
                                      AND O.ESTBODT > DATE('0001-01-01')
@@ -240,7 +242,8 @@
                                        + MONTH(O.MINQTYDT) * 100
                                        + DAY(O.MINQTYDT)
                                END AS DUE8,
-                               O.JOBNUM7 AS JOB7
+                               O.JOBNUM7 AS JOB7,
+                               O.MINQTYDT AS MINQ
                           FROM IVPORRITM O
                          WHERE O."HOLD" = ' '
                            AND ( :WrkStsChk = 'N'
@@ -260,7 +263,8 @@
                                R.FINISHYYYY * 10000
                              + R.FINISHMM * 100
                              + R.FINISHDD AS DUE8,
-                               R.JOBNUM7 AS JOB7
+                               R.JOBNUM7 AS JOB7,
+                               DATE('0001-01-01') AS MINQ
                           FROM RERUN8 R
                          WHERE R."DELETE" = ' '
                            AND R.FINISHYYYY >= 1900
@@ -282,14 +286,16 @@
          Endif;
 
          Exec SQL FETCH CsrCand
-                    INTO :WrkCndItem, :WrkCndDue8, :WrkCndJob;
+                    INTO :WrkCndItem, :WrkCndDue8, :WrkCndJob,
+                         :WrkCndMinQ;
          Dow SqlCod = 0;
 
             WrkCntRead += 1;
             Exsr Sbr_Process_Item;
 
             Exec SQL FETCH CsrCand
-                       INTO :WrkCndItem, :WrkCndDue8, :WrkCndJob;
+                       INTO :WrkCndItem, :WrkCndDue8, :WrkCndJob,
+                         :WrkCndMinQ;
          Enddo;
 
          Exec SQL CLOSE CsrCand;
@@ -498,10 +504,18 @@
             //     exactly what IVRORRNEWP reports to production - so a
             //     suggestion now would ask an editor to redo a decision
             //     already made, or worse, overwrite it on approval.
-            Chain (WrkCndItem) IVPORRITM;
+            //
+            //     IVPORRITM keeps a row per item per re-run, keyed ITMNUM +
+            //     MINQTYDT, so the row is read by both: by item alone the
+            //     chain would land on the oldest re-run, whose NEWPRICE
+            //     is history. The cursor carries this re-run's MINQTYDT;
+            //     0001-01-01 means the title came from RERUN8 alone.
             WrkQueRow = 'N';
-            If %Found(IVPORRITM);
-               WrkQueRow = 'Y';
+            If WrkCndMinQ > D'0001-01-01';
+               Chain (WrkCndItem : WrkCndMinQ) IVPORRITM;
+               If %Found(IVPORRITM);
+                  WrkQueRow = 'Y';
+               Endif;
             Endif;
             If WrkQueRow = 'Y' And ORR_NEWPRICE <> 0
                And ORR_NEWPRICE <> ITM_PRICE72;
@@ -966,6 +980,10 @@
             SUG_RPCLSTCHG = WrkLstChg;
             SUG_RPCDUEDT  = WrkDueDt;
             SUG_RPCJOB7   = WrkCndJob;
+            SUG_RPCMINQDT = D'0001-01-01';
+            If WrkQueRow = 'Y';
+               SUG_RPCMINQDT = WrkCndMinQ;
+            Endif;
             SUG_RPCCNOFL  = 'N';
             SUG_RPCCNORCD = 0;
             SUG_RPCCNOSET = 'N';
