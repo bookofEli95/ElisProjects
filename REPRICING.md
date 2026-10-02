@@ -119,6 +119,29 @@ a catalogue moves phase by having its `IVPRPCCTL.RPCPHASE` changed:
 Everything is seeded at phase `0`. Building and seeding on their own change no
 prices; a catalogue takes part only when someone gives it a row.
 
+## Series rules (Instrumental band sets)
+
+Instrumental prices concert band sets by series and grade, not by catalogue
+(*Instrumental pricing - Should we increase prices for 2026-27*). The series is
+on the item (`IVPITEMS.SERIES`, e.g. `MW3` MusicWorks grade 3, `FLXBD2`
+Flex-Band grade 2), and a series can sit in more than one catalogue -
+Windependence (`BHWND*`) and Schirmer (`GSCB`) band sets are in the Classical
+catalogues 5912 and 5934.
+
+So a rule row can name a series instead of a group: `RULCATG '*SER'` and
+`RULSERIES`. The generator tries series rows first, wherever the item is (as
+long as its catalogue is switched on), then the catalogue group's rows. The
+suggestion records `RPCCATG '*SER'` so that the override cap is checked against
+the same rule.
+
+`IVPRPCRUL_band_seed.sql` loads the band table this way. PD and License/Medley
+are told apart by price - within a series they sit at different standard prices
+- because `CPRTUN` does not separate them. Each row matches one set price; every
+other price in the series falls to a catch-all row that adds nothing, so sets
+away from the standard are left alone until Paul says otherwise. Rows whose
+series code is a guess (Easy Flex-Band, Schirmer, B&H Concert Band, Canadian
+Brass grades 2 and 3) are in the file but commented out.
+
 ## The pricing logic is a table, not code
 
 Both published models fit one shape, so both are seeded and either can be

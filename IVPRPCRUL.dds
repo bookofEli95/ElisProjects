@@ -42,6 +42,12 @@
      A                                      COLHDG('SCEN' 'ARIO')
      A            RULSEQ         3S 0       TEXT('Match order within model')
      A                                      COLHDG('SEQ')
+     A* RULSERIES: rows with RULCATG '*SER' match on the item's
+     A* IVPITEMS.SERIES instead of its catalogue group, in any catalogue
+     A* that is switched on, and are tried before the group's own rows.
+     A* Blank on every other row.
+     A            RULSERIES      6A         TEXT('Item series for *SER rows')
+     A                                      COLHDG('ITEM' 'SERIES')
      A            RULPRCFR       9S 2       TEXT('Price band from incl')
      A                                      COLHDG('BAND' 'FROM')
      A            RULPRCTO       9S 2       TEXT('Price band to incl')

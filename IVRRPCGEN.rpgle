@@ -90,6 +90,7 @@
      D RulModel        S              1A   Dim(WrkMaxRul)
      D RulScen         S              1A   Dim(WrkMaxRul)
      D RulSeq          S              3S 0 Dim(WrkMaxRul)
+     D RulSeries       S              6A   Dim(WrkMaxRul)
      D RulPrcFr        S              9S 2 Dim(WrkMaxRul)
      D RulPrcTo        S              9S 2 Dim(WrkMaxRul)
      D RulChgFr        S               D   Dim(WrkMaxRul)
@@ -425,6 +426,7 @@
                RulModel(RulCnt)  = RUL_RULMODEL;
                RulScen(RulCnt)   = RUL_RULSCEN;
                RulSeq(RulCnt)    = RUL_RULSEQ;
+               RulSeries(RulCnt) = RUL_RULSERIES;
                RulPrcFr(RulCnt)  = RUL_RULPRCFR;
                RulPrcTo(RulCnt)  = RUL_RULPRCTO;
                RulChgFr(RulCnt)  = RUL_RULCHGFR;
@@ -801,19 +803,45 @@
             // The first row whose price band and last-change window both
             // contain the item wins. The table was read in key order, so
             // RULSEQ decides precedence wherever bands overlap.
+            //
+            // Series rows ('*SER') are tried first. Some catalogues price
+            // by series rather than by catalogue - the Instrumental band
+            // table prices MusicWorks 3 and Flex-Band 2 differently at the
+            // same price - and a series can sit in more than one catalogue
+            // (Windependence and Schirmer band sets are in the Classical
+            // catalogues). A series row applies wherever the item is, so
+            // long as its catalogue is switched on.
             WrkRulIdx = 0;
-            For WrkIdx = 1 To RulCnt;
-               If RulCatg(WrkIdx)   = CTL_RPCCATG
-              And RulModel(WrkIdx)  = CTL_RPCMODEL
-              And RulScen(WrkIdx)   = CTL_RPCSCEN
-              And WrkBasePrc       >= RulPrcFr(WrkIdx)
-              And WrkBasePrc       <= RulPrcTo(WrkIdx)
-              And WrkLstChg        >= RulChgFr(WrkIdx)
-              And WrkLstChg        <= RulChgTo(WrkIdx);
-                  WrkRulIdx = WrkIdx;
-                  Leave;
-               Endif;
-            Endfor;
+            If ITM_SERIES <> *Blanks;
+               For WrkIdx = 1 To RulCnt;
+                  If RulCatg(WrkIdx)   = '*SER'
+                 And RulSeries(WrkIdx) = ITM_SERIES
+                 And RulModel(WrkIdx)  = CTL_RPCMODEL
+                 And RulScen(WrkIdx)   = CTL_RPCSCEN
+                 And WrkBasePrc       >= RulPrcFr(WrkIdx)
+                 And WrkBasePrc       <= RulPrcTo(WrkIdx)
+                 And WrkLstChg        >= RulChgFr(WrkIdx)
+                 And WrkLstChg        <= RulChgTo(WrkIdx);
+                     WrkRulIdx = WrkIdx;
+                     Leave;
+                  Endif;
+               Endfor;
+            Endif;
+
+            If WrkRulIdx = 0;
+               For WrkIdx = 1 To RulCnt;
+                  If RulCatg(WrkIdx)   = CTL_RPCCATG
+                 And RulModel(WrkIdx)  = CTL_RPCMODEL
+                 And RulScen(WrkIdx)   = CTL_RPCSCEN
+                 And WrkBasePrc       >= RulPrcFr(WrkIdx)
+                 And WrkBasePrc       <= RulPrcTo(WrkIdx)
+                 And WrkLstChg        >= RulChgFr(WrkIdx)
+                 And WrkLstChg        <= RulChgTo(WrkIdx);
+                     WrkRulIdx = WrkIdx;
+                     Leave;
+                  Endif;
+               Endfor;
+            Endif;
 
          Endsr;
       /end-free
@@ -953,7 +981,10 @@
             SUG_ITMNUM    = WrkCndItem;
             SUG_RPCCYCL   = WrkCycle;
             SUG_DIVCAT    = ITM_DIVCAT;
-            SUG_RPCCATG   = CTL_RPCCATG;
+            // The group of the rule that matched - '*SER' for a series
+            // rule - so that IVRRPCWRK and IVRRPCAPL read back the same
+            // rule by key when checking an override against its cap.
+            SUG_RPCCATG   = RulCatg(WrkRulIdx);
             SUG_RPCPHASE  = WrkPhase;
             SUG_RPCMODEL  = CTL_RPCMODEL;
             SUG_RPCSCEN   = CTL_RPCSCEN;
