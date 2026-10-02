@@ -19,9 +19,20 @@ programs match an item to a row and do the arithmetic.
 - **V1 keeps the manual step at reprint**: the editor approves the price, and it
   is copied onto the item by hand at the reprint, as today.
 
-Still open: how cheap items (choral octavos, instrumental parts under $5) should
-be treated under the brackets, and whether titles qualify after 12 or 18 months
-without a price change.
+## Decisions (Paul Moore, 2 Oct 2026)
+
+- **Review every 12 months.** A title repriced in the last 12 months is left
+  alone (`RPCELGMO` 12, now the seed).
+- **Pop, Classical and Self-Teach are good to go** on the brackets.
+- **Instrumental and Choral price more finely than the brackets**, especially
+  low-priced items. Instrumental's table is on the 2026-06-22 page *Instrumental
+  pricing - Should we increase prices for 2026-27*; Choral is still being worked
+  through with the team. Both stay at phase 0 until their rows are loaded.
+
+Still open: the newest bracket window ends 2025-12-31. With a 12-month review, a
+title repriced in January 2026 is due again in January 2027 and no window covers
+it, so it gets no suggestion (`Skip no rule`) until the window is extended or a
+new one added.
 
 Related tickets Paul has asked to fold into this project, all part of removing
 prices from the back of books: SOS-2092 (a field saying whether a product has a
@@ -593,9 +604,8 @@ is control data rather than a hard-coded guess, so closing it is a data change.
    this twice: *"question marks over our ability to raise prices under third
    party agreements"* and *"Faber-linked — subject to the pricing-authority
    check"*.
-8. **Eligibility window.** Three appear in the sources: 18 months (all four
-   quarterly re-run pages), 12 months (brackets document), and an Aug-2025 cutoff
-   (evaluating document). Seeded at 18. `RPCELGMO`.
+8. **Eligibility window.** Settled: 12 months (Paul, 2 Oct 2026). Seeded at 12.
+   `RPCELGMO`.
 9. **Do brackets snap to `.99`?** The brackets document says nothing, so bracket
    rows are seeded `RULROUND 'NONE'` and produce prices like `$61.00` from a
    `$45.00` base. The percentage model snaps, because its source says to.

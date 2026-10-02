@@ -116,7 +116,7 @@ INSERT INTO OBJECT.IVPRPCCTL
          RPCAPLTGT, RPCPRCUACT, RPCMNTTS, RPCMNTWHO)
 VALUES
   (0, '     ', '0', 'B', 'S',
-   18, 6, 3,
+   12, 6, 3,
    'Y', 'H',
    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
    DATE('1900-01-01'), 'Y',
@@ -135,7 +135,7 @@ VALUES
 --          RPCAPLTGT, RPCPRCUACT, RPCMNTTS, RPCMNTWHO)
 -- VALUES
 --   (9999999, 'CHO', '1', 'B', 'S',
---    18, 6, 3,
+--    12, 6, 3,
 --    'Y', 'H',
 --    ' *BLANK A K B I P ', ' J N ', ' PRICE PRICE72 PRICE112 ',
 --    DATE('1900-01-01'), 'Y',
