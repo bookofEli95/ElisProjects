@@ -26,10 +26,18 @@
 -- rows in the commented block at the end, whose series code is a guess.
 --
 -- Needs RULSERIES on IVPRPCRUL (CHGPF from the current DDS first).
--- Run with NAMING(*SQL).
+--
+-- The table is named without a library, so one script serves the test
+-- library and production. Say which with DFTRDBCOL:
+--
+--   RUNSQLSTM SRCSTMF('.../IVPRPCRUL_band_seed.sql') COMMIT(*NONE)
+--             NAMING(*SQL) DFTRDBCOL(H33979)
+--
+-- Left out, SQL naming looks in the schema named after your user
+-- profile, which has no IVPRPCRUL, so the insert fails harmlessly.
 -- ====================================================================
 
-INSERT INTO OBJECT.IVPRPCRUL
+INSERT INTO IVPRPCRUL
         (RULCATG, RULMODEL, RULSCEN, RULSEQ, RULSERIES,
          RULPRCFR, RULPRCTO, RULCHGFR, RULCHGTO,
          RULUPLAMT, RULUPLPCT, RULMINAMT, RULCAPPCT, RULCAPAMT,
@@ -253,7 +261,7 @@ VALUES
 -- Not loaded: series code not confirmed. Check, then load these the
 -- same way (each series also wants its own catch-all row).
 -- ------------------------------------------------------------------
--- INSERT INTO OBJECT.IVPRPCRUL
+-- INSERT INTO IVPRPCRUL
 --         (RULCATG, RULMODEL, RULSCEN, RULSEQ, RULSERIES,
 --          RULPRCFR, RULPRCTO, RULCHGFR, RULCHGTO,
 --          RULUPLAMT, RULUPLPCT, RULMINAMT, RULCAPPCT, RULCAPAMT,
