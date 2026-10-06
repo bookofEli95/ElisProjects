@@ -1,0 +1,98 @@
+     A* *********************************************************
+     A*  IVVRPCWRK
+     A*  Work with Repricing Suggestions - display file
+     A* *********************************************************
+     A*  The screen an editor approves or overrides a suggestion on,
+     A*  which is what phase 1 means: AS400 puts up a number and a
+     A*  person decides.
+     A*
+     A*  Two lines per suggestion. The first shows what the price is
+     A*  now, what is suggested, when the title is due to re-run and
+     A*  when it was last repriced - the four things needed to judge
+     A*  the number without leaving the screen. The second shows the
+     A*  note: the bracket used, or why the line is held.
+     A*
+     A*  Options:  2  override, using the price typed in the New column
+     A*            4  reject, leaving the price alone
+     A*            6  approve the suggested price
+     A*
+     A*  An override past the catalogue cap is not refused. It is held on
+     A*  the file at status 'G' and reported, and typing 2 again on the
+     A*  held line authorises it - so the confirmation survives a
+     A*  refresh, a sign-off and a shift change, and is recorded against
+     A*  the editor who gave it.
+     A*
+     A*  SCYCL is hidden rather than shown: each line has to carry its own
+     A*  key, and the cycle is of no interest to the person reading it.
+     A* *********************************************************
+     A                                      DSPSIZ(24 80 *DS3)
+     A                                      PRINT
+     A                                      CA03(03 'Exit')
+     A                                      CF05(05 'Refresh')
+     A                                      CA12(12 'Cancel')
+     A*
+     A*  Subfile record - one repricing suggestion
+     A          R RPCSFL1                   SFL
+     A            SOPT           1A  B  7  3VALUES(' ' '2' '4' '6')
+     A            SITEM          8S 0O  7  6
+     A            SCYCL          6S 0H
+     A            SDESC         17A  O  7 15
+     A            SSTAT          1A  O  7 33
+     A            SCUR           7Y 2O  7 35EDTCDE(3)
+     A            SSUG           7Y 2O  7 44EDTCDE(3)
+     A            SNEW           7Y 2B  7 53EDTCDE(4)
+     A* The two dates are shown as text, set by the program: a title
+     A* with no recorded price change carries 1900-01-01, which a
+     A* MM/DD/YY date field cannot hold, and shows as 'none'.
+     A            SDUE           8A  O  7 62
+     A            SLSTC          8A  O  7 71
+     A* Second line: the suggestion's note - the bracket it came from,
+     A* or why it is held. Highlighted when held (status G), because G
+     A* covers both a third-party approval and an override past the cap.
+     A            SNOTE         60A  O  8 15
+     A  31                                  DSPATR(HI)
+     A*
+     A*  Subfile control
+     A          R RPCCTL1                   SFLCTL(RPCSFL1)
+     A                                      SFLSIZ(9999)
+     A                                      SFLPAG(0006)
+     A*                                     Load-all subfile: SFLSIZ is
+     A*                                     larger than SFLPAG, so the
+     A*                                     system does the paging.
+     A*                                     Six to a page, two lines
+     A*                                     each: rows 7 to 18.
+     A                                      OVERLAY
+     A  21                                  SFLDSP
+     A  22                                  SFLDSPCTL
+     A  23                                  SFLCLR
+     A  24                                  SFLEND(*MORE)
+     A                                  1  2'IVRRPCWRK'
+     A                                  1 24'Work with Repricing Suggestions'
+     A            WDATE           L  O  1 68DATFMT(*MDY)
+     A                                      DATSEP('/')
+     A                                  3  2'Catalogue . . .'
+     A            WDIVCAT        7S 0B  3 18
+     A                                  3 28'0 = all'
+     A                                  3 40'Status . . .'
+     A            WSTAT          1A  B  3 53
+     A                                  3 56'blank = open'
+     A                                  5  2'Opt'
+     A                                  5  6'Item'
+     A                                  5 15'Description'
+     A                                  5 32'St'
+     A                                  5 35'Current'
+     A                                  5 45'Suggest'
+     A                                  5 55'New'
+     A                                  5 64'Due'
+     A                                  5 71'Repriced'
+     A*
+     A*  Footer - the message line and the keys. A record of its own,
+     A*  because a control record takes up every line from its first
+     A*  to its last, so lines below the subfile would overlap it.
+     A*  Written before each EXFMT of RPCCTL1.
+     A          R RPCFTR1
+     A                                      OVERLAY
+     A            WMSG          78A  O 21  2DSPATR(HI)
+     A                                 22  2'2=Override   4=Reject   6=Approve'
+     A                                 22 45'St: S=New A=Appr O=Ovr G=Held'
+     A                                 23  2'F3=Exit   F5=Refresh   F12=Cancel'

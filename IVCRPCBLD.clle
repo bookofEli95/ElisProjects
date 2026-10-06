@@ -1,0 +1,202 @@
+/* ************************************************************************** */
+/* * IVCRPCBLD                                                              * */
+/* * Create the Re-run Repricing Objects                                    * */
+/* ************************************************************************** */
+
+/* ************************************************************************** */
+/* * Program Information                                                    * */
+/* *------------------------------------------------------------------------* */
+/* * Creates everything this release adds, in dependency order: the         * */
+/* * physical files first, then the logical over the suggestion file,       * */
+/* * then the display file, then the programs that reference them.          * */
+/* *                                                                        * */
+/* * Two parameters:                                                        * */
+/* *   &OBJLIB  library the objects are created in - H33979 for testing,    * */
+/* *            OBJECT once it is confirmed                                 * */
+/* *   &SRCLIB  library holding QDDSSRC, QRPGLESRC and QCLLESRC             * */
+/* *                                                                        * */
+/* *   CALL IVCRPCBLD PARM('H33979' 'SOURCE')                               * */
+/* *                                                                        * */
+/* * The library holding QCOPYSRC (statusds, checksec, ivrudrlitm) must     * */
+/* * be on the library list.                                                * */
+/* *                                                                        * */
+/* * The programs name no library for their files, their SQL tables or      * */
+/* * the programs they call: everything goes through the library list.      * */
+/* * So the build makes &OBJLIB the current library while it runs - the     * */
+/* * logical file then sits over &OBJLIB's suggestion file, and the         * */
+/* * programs compile against &OBJLIB's files - and puts the current        * */
+/* * library back at the end. To test, put the test library ahead of        * */
+/* * OBJECT in the library list; production runs with OBJECT alone.         * */
+/* *                                                                        * */
+/* * It can be run again after a failure: files already created are         * */
+/* * kept, and it carries on from where it stopped. If a create fails,      * */
+/* * it ends with a message naming the object, and the reason is in the     * */
+/* * compile listing (WRKSPLF).                                             * */
+/* *                                                                        * */
+/* * The three seed scripts are run afterwards, not from here, because      * */
+/* * seeding is a data decision and this is an object build:                * */
+/* *                                                                        * */
+/* *   RUNSQLSTM SRCSTMF('.../IVPRPCCTL_seed.sql') COMMIT(*NONE) +          * */
+/* *             NAMING(*SQL)                                               * */
+/* *   (the same for IVPRPCRUL_seed.sql and IVPRPCLAD_seed.sql)             * */
+/* *                                                                        * */
+/* * The scripts are written with SQL naming (OBJECT.IVPRPCCTL), so         * */
+/* * they are run with NAMING(*SQL). For a test library, copy the seeded    * */
+/* * rows across instead, e.g.                                              * */
+/* *   CPYF FROMFILE(OBJECT/IVPRPCRUL) TOFILE(H33979/IVPRPCRUL) +           * */
+/* *        MBROPT(*ADD)                                                    * */
+/* *                                                                        * */
+/* * Every catalogue stays at phase 0 until a control row says otherwise,   * */
+/* * so building and seeding on their own change no prices.                 * */
+/* ************************************************************************** */
+
+/* ************************************************************************** */
+/* * Program History                                                        * */
+/* *------------------------------------------------------------------------* */
+/* * Project   Date   Int Description                                       * */
+/* * ------- -------- --- --------------------------------------------------* */
+/* * H33979  10/01/26 EFI Create re-run repricing build CL                  * */
+/* ************************************************************************** */
+
+             PGM        PARM(&OBJLIB &SRCLIB)
+
+             DCL        VAR(&OBJLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&STEP)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSGID)  TYPE(*CHAR) LEN(7)
+             DCL        VAR(&OLDCUR) TYPE(*CHAR) LEN(10)
+
+             /* Any create that fails stops the build at ERROR, which    */
+             /* names the object it was on, instead of ending in a      */
+             /* function check and a program dump.                      */
+             MONMSG     MSGID(CPF0000 MCH0000) EXEC(GOTO CMDLBL(ERROR))
+
+             /* Unqualified names resolve to &OBJLIB first while the    */
+             /* build runs; the job's own current library is restored   */
+             /* at the end, and on failure.                              */
+             RTVJOBA    CURLIB(&OLDCUR)
+             CHGVAR     VAR(&STEP) VALUE('CURLIB')
+             CHGCURLIB  CURLIB(&OBJLIB)
+
+             /* ---- files ------------------------------------------- */
+             /* A physical file that already exists is kept, not        */
+             /* rebuilt, so a second run cannot lose seeded rules or    */
+             /* suggestions. To rebuild one on purpose, DLTF it first.  */
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCCTL')
+             CHKOBJ     OBJ(&OBJLIB/IVPRPCCTL) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(&OBJLIB/IVPRPCCTL) SRCFILE(&SRCLIB/QDDSSRC) +
+                          SRCMBR(IVPRPCCTL) +
+                          TEXT('Re-run repricing control')
+             ENDDO
+
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCRUL')
+             CHKOBJ     OBJ(&OBJLIB/IVPRPCRUL) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(&OBJLIB/IVPRPCRUL) SRCFILE(&SRCLIB/QDDSSRC) +
+                          SRCMBR(IVPRPCRUL) +
+                          TEXT('Re-run repricing rules')
+             ENDDO
+
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCLAD')
+             CHKOBJ     OBJ(&OBJLIB/IVPRPCLAD) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(&OBJLIB/IVPRPCLAD) SRCFILE(&SRCLIB/QDDSSRC) +
+                          SRCMBR(IVPRPCLAD) +
+                          TEXT('Re-run repricing price ladder')
+             ENDDO
+
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCSUG')
+             CHKOBJ     OBJ(&OBJLIB/IVPRPCSUG) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(&OBJLIB/IVPRPCSUG) SRCFILE(&SRCLIB/QDDSSRC) +
+                          SRCMBR(IVPRPCSUG) +
+                          TEXT('Re-run repricing suggestions')
+             ENDDO
+
+             CHGVAR     VAR(&STEP) VALUE('IVPPRTPRT')
+             CHKOBJ     OBJ(&OBJLIB/IVPPRTPRT) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(&OBJLIB/IVPPRTPRT) SRCFILE(&SRCLIB/QDDSSRC) +
+                          SRCMBR(IVPPRTPRT) +
+                          TEXT('Item printed price and approval')
+             ENDDO
+
+             /* The logical and the display file hold no data, so they  */
+             /* are always rebuilt from the current source.             */
+             CHGVAR     VAR(&STEP) VALUE('IVPRPCSG1')
+             DLTF       FILE(&OBJLIB/IVPRPCSG1)
+             MONMSG     MSGID(CPF2105)
+             CRTLF      FILE(&OBJLIB/IVPRPCSG1) SRCFILE(&SRCLIB/QDDSSRC) +
+                          SRCMBR(IVPRPCSG1) +
+                          TEXT('Repricing suggestions by catalogue')
+
+             /* ---- display file ----------------------------------- */
+             CHGVAR     VAR(&STEP) VALUE('IVVRPCWRK')
+             DLTF       FILE(&OBJLIB/IVVRPCWRK)
+             MONMSG     MSGID(CPF2105)
+             CRTDSPF    FILE(&OBJLIB/IVVRPCWRK) SRCFILE(&SRCLIB/QDDSSRC) +
+                          SRCMBR(IVVRPCWRK) +
+                          TEXT('Work with repricing suggestions')
+
+             /* ---- programs --------------------------------------- */
+             /* All three use embedded SQL, so they go through the     */
+             /* SQL precompiler rather than CRTBNDRPG. Their SQL names */
+             /* tables without a library, so with system naming they   */
+             /* are found through the library list, the same as the    */
+             /* F-spec files.                                          */
+             /* Programs are replaced if they already exist.           */
+             CHGVAR     VAR(&STEP) VALUE('IVRRPCGEN')
+             CRTSQLRPGI OBJ(&OBJLIB/IVRRPCGEN) SRCFILE(&SRCLIB/QRPGLESRC) +
+                          SRCMBR(IVRRPCGEN) OBJTYPE(*PGM) +
+                          COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          TEXT('Generate repricing suggestions')
+
+             CHGVAR     VAR(&STEP) VALUE('IVRRPCAPL')
+             CRTSQLRPGI OBJ(&OBJLIB/IVRRPCAPL) SRCFILE(&SRCLIB/QRPGLESRC) +
+                          SRCMBR(IVRRPCAPL) OBJTYPE(*PGM) +
+                          COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          TEXT('Apply and expire repricing suggestions')
+
+             CHGVAR     VAR(&STEP) VALUE('IVRRPCWRK')
+             CRTSQLRPGI OBJ(&OBJLIB/IVRRPCWRK) SRCFILE(&SRCLIB/QRPGLESRC) +
+                          SRCMBR(IVRRPCWRK) OBJTYPE(*PGM) +
+                          COMMIT(*NONE) DBGVIEW(*SOURCE) +
+                          TEXT('Work with repricing suggestions')
+
+             /* ---- monthly driver -------------------------------- */
+             CHGVAR     VAR(&STEP) VALUE('IVCRPCMTH')
+             CRTBNDCL   PGM(&OBJLIB/IVCRPCMTH) SRCFILE(&SRCLIB/QCLLESRC) +
+                          SRCMBR(IVCRPCMTH) +
+                          TEXT('Re-run repricing monthly run')
+
+             CHGVAR     VAR(&STEP) VALUE('CURLIB')
+             IF         COND(&OLDCUR *EQ '*NONE') THEN( +
+                          CHGCURLIB CURLIB(*CRTDFT))
+             ELSE       CMD(CHGCURLIB CURLIB(&OLDCUR))
+
+             SNDPGMMSG  MSG('Repricing objects created in ' *CAT +
+                          &OBJLIB *TCAT '. Seed the three control +
+                          files before opting any catalogue in to +
+                          phase 1.')
+
+             RETURN
+
+ ERROR:      RCVMSG     MSGTYPE(*EXCP) RMV(*NO) MSGID(&MSGID)
+             MONMSG     MSGID(CPF0000)
+             IF         COND(&OLDCUR *EQ '*NONE') THEN(DO)
+                          CHGCURLIB  CURLIB(*CRTDFT)
+                          MONMSG     MSGID(CPF0000)
+             ENDDO
+             ELSE       CMD(DO)
+                          CHGCURLIB  CURLIB(&OLDCUR)
+                          MONMSG     MSGID(CPF0000)
+             ENDDO
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('IVCRPCBLD stopped creating ' *CAT +
+                          &STEP *TCAT ' (' *CAT &MSGID *TCAT +
+                          ') - see the job log and its compile +
+                          listing in WRKSPLF') +
+                          MSGTYPE(*ESCAPE)
+
+             ENDPGM

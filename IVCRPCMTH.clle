@@ -1,0 +1,92 @@
+/* ************************************************************************** */
+/* * IVCRPCMTH                                                              * */
+/* * Re-run Repricing Monthly Run                                           * */
+/* ************************************************************************** */
+
+/* ************************************************************************** */
+/* * Program Information                                                    * */
+/* *------------------------------------------------------------------------* */
+/* * The monthly cycle, in the order the two programs have to run in:       * */
+/* *                                                                        * */
+/* *   1. IVRRPCGEN  looks at what is due to re-run and works out a         * */
+/* *                 suggested price per catalogue                          * */
+/* *   2. IVRRPCAPL  attaches the correction note (CNO) to each new         * */
+/* *                 suggestion, stages what editors approved, stages       * */
+/* *                 phase 2 catalogues automatically, and expires          * */
+/* *                 anything nobody acted on so that its CNO comes off     * */
+/* *                                                                        * */
+/* * Generating first means a title that becomes due this month is in       * */
+/* * front of an editor from today rather than waiting a month.             * */
+/* *                                                                        * */
+/* * Parameters                                                             * */
+/* *   CYCLE   YYYYMM, or *CUR for the current month                        * */
+/* *   DIVCAT  A single catalogue, or *ALL                                  * */
+/* *   MODE    *PROD    generate and apply                                  * */
+/* *           *REPORT  write nothing and apply nothing. Use it to see      * */
+/* *                    what a catalogue would be told before opting it     * */
+/* *                    in to phase 1.                                      * */
+/* ************************************************************************** */
+
+/* ************************************************************************** */
+/* * Program History                                                        * */
+/* *------------------------------------------------------------------------* */
+/* * Project   Date   Int Description                                       * */
+/* * ------- -------- --- --------------------------------------------------* */
+/* * H33979  10/01/26 EFI Create re-run repricing monthly run CL            * */
+/* ************************************************************************** */
+
+             PGM        PARM(&CYCLE &DIVCAT &MODE)
+
+             DCL        VAR(&CYCLE)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DIVCAT)  TYPE(*CHAR) LEN(7)
+             DCL        VAR(&MODE)    TYPE(*CHAR) LEN(7)
+
+             DCL        VAR(&GENMODE) TYPE(*CHAR) LEN(1) VALUE('P')
+             DCL        VAR(&APLMODE) TYPE(*CHAR) LEN(1) VALUE('M')
+             DCL        VAR(&WRKCYCL) TYPE(*CHAR) LEN(6)
+
+             /* A failed monthly run has to be visible. Without this a  */
+             /* silent failure would skip a month of suggestions and    */
+             /* nobody would know until the CNOs did not appear.        */
+             MONMSG     MSGID(CPF0000 MCH0000) EXEC(GOTO CMDLBL(ERROR))
+
+             /* A blank cycle is what IVRRPCGEN reads as "this month".  */
+             IF         COND(&CYCLE *EQ '*CUR') THEN(DO)
+                          CHGVAR     VAR(&WRKCYCL) VALUE(' ')
+             ENDDO
+             ELSE       CMD(DO)
+                          CHGVAR     VAR(&WRKCYCL) VALUE(&CYCLE)
+             ENDDO
+
+             /* The two programs are called through the library list,  */
+             /* like the files they open, so a test library ahead of   */
+             /* OBJECT runs its own copies against its own files.       */
+
+             /* In report mode the generator writes nothing and the     */
+             /* applier is not called at all, so a dry run cannot move  */
+             /* a price or attach a CNO.                                */
+             IF         COND(&MODE *EQ '*REPORT') THEN(DO)
+                          CHGVAR     VAR(&GENMODE) VALUE('R')
+                          CALL       PGM(IVRRPCGEN) +
+                                       PARM(&WRKCYCL &DIVCAT &GENMODE)
+                          SNDPGMMSG  MSG('Repricing report-only run +
+                                       finished. Nothing was written.')
+                          RETURN
+             ENDDO
+
+             CALL       PGM(IVRRPCGEN) +
+                          PARM(&WRKCYCL &DIVCAT &GENMODE)
+
+             CALL       PGM(IVRRPCAPL) +
+                          PARM(&APLMODE &WRKCYCL)
+
+             SNDPGMMSG  MSG('Repricing monthly run finished for cycle +
+                          ' *CAT &WRKCYCL)
+
+             RETURN
+
+ ERROR:      SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('IVCRPCMTH failed - see the job log') +
+                          MSGTYPE(*ESCAPE)
+
+             ENDPGM

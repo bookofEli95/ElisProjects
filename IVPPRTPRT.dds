@@ -1,0 +1,46 @@
+     A**********************************************************
+     A* IVPPRTPRT
+     A* Item printed price and third-party approval
+     A**********************************************************
+     A* SOS-2092 and SOS-2520, combined as SOS-2520 asks. A file of
+     A* its own, keyed by item, rather than new fields on IVPITEMS:
+     A* adding to IVPITEMS would mean recompiling every program that
+     A* uses it, and the SYNC_IVPITEMS triggers copy that record to
+     A* another system.
+     A*
+     A* No row for an item means both are unknown - the same as
+     A* blank. Rows are only needed for items where something is
+     A* known, so nothing has to be loaded for the rest.
+     A*
+     A* PRTPRC  is the price printed on the product?
+     A*           Y  yes
+     A*           N  no
+     A*           S  stickered on receipt (imports and distributed
+     A*              titles that arrive without a US price)
+     A*           blank  not known
+     A*
+     A* TPAPRV  does a price change need third-party approval?
+     A*           Y  yes - a price change must be approved first
+     A*           N  no
+     A*           blank  not known
+     A*
+     A* Changes are audited in IVPMAINT under FLDNAM PRTPRC and
+     A* TPAPRV, the way every other item field is.
+     A**********************************************************
+     A                                      REF(OBJECT/FIELD_REF FIELD$REF)
+     A                                      UNIQUE
+     A          R IV$PRTPRT                 TEXT('Printed price and approval')
+     A            ITMNUM    R
+     A            PRTPRC         1A         TEXT('Printed price Y N S blank')
+     A                                      COLHDG('PRINTED' 'PRICE')
+     A            TPAPRV         1A         TEXT('3rd party approval Y N blnk')
+     A                                      COLHDG('3RD PARTY' 'APPROVAL')
+     A            ADDTS           Z         TEXT('Add timestamp')
+     A                                      COLHDG('ADD' 'TS')
+     A            ADDUSER       10A         TEXT('Add user')
+     A                                      COLHDG('ADD' 'USER')
+     A            CHGTS           Z         TEXT('Change timestamp')
+     A                                      COLHDG('CHANGE' 'TS')
+     A            CHGUSER       10A         TEXT('Change user')
+     A                                      COLHDG('CHANGE' 'USER')
+     A          K ITMNUM
