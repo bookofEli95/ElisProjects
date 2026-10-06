@@ -18,6 +18,9 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
+       // HXXXXX  10/06/26 EFI Skip digital items listed in RLPDGTEXC (exempt
+       //                      from the monthly refresh) instead of a hard-
+       //                      coded item list
        // H30612  12/07/22 TAK Fix Program That Automatically Creates MP3 Digita
        //                      l Items
        // H30629  11/16/22 TAK Data not being copied over for Ebooks: Copy field
@@ -55,6 +58,7 @@
 
        // Input Files
      FRLPDSNHG  IF   E           K DISK    Prefix(Dsn_)
+     FRLLDGTEXC IF   E           K DISK    Prefix(Exc_)
 
        // Update Files
      FIVLEPUBIT1UF   E           K DISK    Prefix(Epb_)
@@ -128,14 +132,9 @@
              Leave;
           Endif;
 
-          // Do not change these items per Karla
-          If Epb_Itmnum = 314900
-             or Epb_Itmnum = 318122
-             or Epb_Itmnum = 108014
-             or Epb_Itmnum = 318362
-             or Epb_Itmnum = 319036
-             or Epb_Itmnum = 333284
-             or Epb_Itmnum = 318385;
+          // Skip items exempt from the monthly refresh
+          Setll (Epb_Itmnum) RLLDGTEXC;
+          If %Equal(RLLDGTEXC);
              Iter;
           Endif;
 

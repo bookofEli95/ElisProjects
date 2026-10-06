@@ -15,6 +15,9 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
+       // HXXXXX  10/06/26 EFI Skip digital items listed in RLPDGTEXC (exempt
+       //                      from the monthly refresh) instead of a hard-
+       //                      coded item list
        // H30629  12/02/22 TAK Data not being copied over for Ebooks - Add TOC r
        //                      ecords for the digital item.
        // H30629  11/16/22 TAK Data not being copied over for Ebooks - Add matri
@@ -35,6 +38,7 @@
 
        // Input Files
      FIVPEPUBITMIF A E           K DISK    Prefix(Epb_)
+     FRLLDGTEXC IF   E           K DISK    Prefix(Exc_)
 
        // Update Files
      FIVLPROD2  UF   E           K DISK    Prefix(Hal_)
@@ -103,15 +107,10 @@
              Leave;
           Endif;
 
-          // Do not change these 2 items per Karla
-          If Epb_Itmnum = 314900
-             or Epb_Itmnum = 318122
-             or Epb_Itmnum = 108014
-             or Epb_Itmnum = 318362
-             or Epb_Itmnum = 319036
-             or Epb_Itmnum = 333284
-             or Epb_Itmnum = 318385;
-                Iter;
+          // Skip items exempt from the monthly refresh
+          Setll (Epb_Itmnum) RLLDGTEXC;
+          If %Equal(RLLDGTEXC);
+             Iter;
           Endif;
 
           // Hal data

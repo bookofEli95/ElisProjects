@@ -16,6 +16,9 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
+       // HXXXXX  10/06/26 EFI Skip digital items listed in RLPDGTEXC (exempt
+       //                      from the monthly refresh) instead of a hard-
+       //                      coded item list
        // MISC3   04/12/16 SRK Remove /Free - /End-Free
        // FIX     08/03/15 DRS Copy Source Not Needed for Progam
        // H2078   10/15/12 DRS fix delete
@@ -24,6 +27,7 @@
 
        // Input Files
      FIVPRELITM IF   E           K DISK    Prefix(Dig_)
+     FRLLDGTEXC IF   E           K DISK    Prefix(Exc_)
 
        // Update Files
      FIVLPROD2  UF   E           K DISK    Prefix(Hal_)
@@ -89,6 +93,12 @@
           Read IVPRELITM;
           If %Eof(IVPRELITM);
              Leave;
+          Endif;
+
+          // Skip items exempt from the monthly refresh
+          Setll (Dig_RelItmnum) RLLDGTEXC;
+          If %Equal(RLLDGTEXC);
+             Iter;
           Endif;
 
           // Hal data

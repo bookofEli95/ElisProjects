@@ -17,6 +17,9 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
+       // HXXXXX  10/06/26 EFI Skip digital items listed in RLPDGTEXC (exempt
+       //                      from the monthly refresh) instead of a hard-
+       //                      coded item list
        // H33962  05/22/26 EI  Roref # For Bock & Pavane items
        // H30612  02/01/23 TAK Set CEXCPT = 'O' and CNTRTP = 'S' if the digital
        //                      item is added to the kit file.
@@ -49,6 +52,9 @@
        // H2766   11/20/12 DRS Add call for RLRCHGTYPE
        // 2078   10/03/12 DRS  ew
        //***********************************************************************
+
+       // Input Files
+     FRLLDGTEXC IF   E           K DISK    Prefix(Exc_)
 
        // Update Files
      FIVPRELITM UF   E           K DISK    Prefix(Rel_)
@@ -125,6 +131,12 @@
           Endif;
 
           If Rel_RelTypeid <> 1;
+             Iter;
+          Endif;
+
+          // Skip items exempt from the monthly refresh
+          Setll (Rel_RelItmnum) RLLDGTEXC;
+          If %Equal(RLLDGTEXC);
              Iter;
           Endif;
 
