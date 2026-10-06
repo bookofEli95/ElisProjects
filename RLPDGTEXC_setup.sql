@@ -14,6 +14,12 @@
 -- through one run first, then exempt it and correct its rates.
 --
 -- Run steps 1 and 2 BEFORE compiling the four programs.
+--
+-- LATER - once digital rates come from the contract (RLPDGTRAT),
+-- take the Willis items back off so they follow print again
+-- (except for the rate). Do not run until then:
+--   DELETE FROM OBJECT.RLPDGTEXC
+--    WHERE COMT40 LIKE 'WILLIS - until digital rates live%';
 --=============================================================
 
 --------------------------------------------------------------
@@ -78,14 +84,6 @@ INSERT INTO OBJECT.RLPDGTEXC (ITMNUM, COMT40) VALUES
 --------------------------------------------------------------
 SELECT E.ITMNUM, I.SDESC, E.COMT40, E.USERID, E.DTEADDED
   FROM OBJECT.RLPDGTEXC E
-  LEFT JOIN IVPITEMS I
+  LEFT JOIN OBJECT.IVPITEMS I
     ON I.ITMNUM = E.ITMNUM
  ORDER BY E.DTEADDED, E.ITMNUM;
-
---------------------------------------------------------------
--- 5. LATER - once digital rates come from the contract,
---    take the Willis items back off so they follow print again
---    (except for the rate). Do not run until then.
---------------------------------------------------------------
--- DELETE FROM OBJECT.RLPDGTEXC
---  WHERE COMT40 LIKE 'WILLIS - until digital rates live%';
