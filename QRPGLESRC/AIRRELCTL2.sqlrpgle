@@ -117,7 +117,6 @@
               select b.*
                 from oepbchk b
                   where b.edtb# <> 0
-                    and b.bchsts <> 'C'
                     and ucase(b.desc20) not in ('MIRAKL EDI',
                                                 'AMAZON.COM NOTE')
                     and ucase(rtrim(b.desc20)) in
