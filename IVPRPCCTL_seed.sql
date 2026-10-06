@@ -106,9 +106,20 @@
 -- Note the retention risk: if IVPMAINT is purged, a title repriced long
 -- ago is indistinguishable from one never repriced, and both land on
 -- the oldest bracket. Confirm IVPMAINT retention before phase 2.
+--
+-- The table is named without a library, so this script loads the test
+-- library or production. Say which with DFTRDBCOL:
+--
+--   RUNSQLSTM SRCSTMF('.../IVPRPCCTL_seed.sql') COMMIT(*NONE)
+--             NAMING(*SQL) DFTRDBCOL(H33979)
+--
+-- Left out, SQL naming looks in the schema named after your user
+-- profile, which has no such table, so the insert fails harmlessly.
+-- Every table is keyed UNIQUE: a second run fails on duplicate keys
+-- (SQL0803) and adds nothing.
 -- ====================================================================
 
-INSERT INTO OBJECT.IVPRPCCTL
+INSERT INTO IVPRPCCTL
         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
          RPCELGMO, RPCHORIZ, RPCEXPCY,
          RPCCNOYN, RPCAUTACT,
@@ -127,7 +138,7 @@ VALUES
 -- placeholder: the AS400 catalogue -> catalogue group mapping still
 -- has to come from Content, so no real DIVCAT is seeded here.
 -- ------------------------------------------------------------------
--- INSERT INTO OBJECT.IVPRPCCTL
+-- INSERT INTO IVPRPCCTL
 --         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
 --          RPCELGMO, RPCHORIZ, RPCEXPCY,
 --          RPCCNOYN, RPCAUTACT,

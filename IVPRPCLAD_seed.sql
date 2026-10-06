@@ -11,9 +11,20 @@
 -- A rule carrying RULROUND 'LADR' lands on the first rung at or above
 -- the rule percentage, so an octavo moves one or more rungs rather than
 -- to an arbitrary .99 price. LADSEQ must ascend with LADPRICE.
+--
+-- The table is named without a library, so this script loads the test
+-- library or production. Say which with DFTRDBCOL:
+--
+--   RUNSQLSTM SRCSTMF('.../IVPRPCLAD_seed.sql') COMMIT(*NONE)
+--             NAMING(*SQL) DFTRDBCOL(H33979)
+--
+-- Left out, SQL naming looks in the schema named after your user
+-- profile, which has no such table, so the insert fails harmlessly.
+-- Every table is keyed UNIQUE: a second run fails on duplicate keys
+-- (SQL0803) and adds nothing.
 -- ====================================================================
 
-INSERT INTO OBJECT.IVPRPCLAD
+INSERT INTO IVPRPCLAD
         (LADCATG, LADSEQ, LADPRICE, LADMNTTS, LADMNTWHO)
 VALUES
   ('CHO',  10, 2.10, CURRENT TIMESTAMP, 'SEED'),
