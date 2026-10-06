@@ -1136,10 +1136,11 @@
          Begsr Sbr_Chain_Queue;
 
             // IVPORRITM keeps a row per item per re-run, keyed ITMNUM +
-            // MINQTYDT. The suggestion records which re-run it was raised
-            // against; by item alone the chain would land on the oldest
-            // re-run and write to history. No MINQTYDT (0001-01-01) means
-            // the title came from RERUN8 and has no queue row at all.
+            // MINQTYDT (descending). The suggestion records which re-run
+            // it was raised against; by item alone the chain lands on the
+            // newest row, which need not be that one. No MINQTYDT
+            // (0001-01-01) means the title came from RERUN8 and has no
+            // queue row at all.
             WrkQueFnd = 'N';
             If SUG_RPCMINQDT > D'0001-01-01';
                Chain (WrkSugItem : SUG_RPCMINQDT) IVPORRITM;

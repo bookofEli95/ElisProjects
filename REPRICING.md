@@ -272,8 +272,13 @@ write, so it cannot undo another job's change to an unrelated field.
   (IVRORRMKT and its satellites) chain by: one row per item per re-run. The
   generator now carries the MINQTYDT of the queue row it picked and records it on
   the suggestion (`RPCMINQDT`), and the applier stages NEWPRICE and sets or clears
-  the CNO flag on that row only. Chained by item alone, both would have landed
-  on the item's oldest row.
+  the CNO flag on that row only. `MINQTYDT` is a descending key, so a chain by
+  item alone lands on the newest row - usually the right one, but not always
+  the active row the generator chose.
+- **The generator fetches dates from SQL as YYYYMMDD numbers.** A date host
+  variable takes the job's date format, and MM/DD/YY (1940-2039) cannot hold
+  every `MINQTYDT` on the queue; one such row ended the candidate read with a
+  data mapping error.
 
 `IVRORRNEWP`, `IVRORRNBR`, `IVRORRIVP2` and `IVRORRCLN` changed the design in
 three places.
