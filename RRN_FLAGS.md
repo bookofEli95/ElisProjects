@@ -230,9 +230,10 @@ with:
              Exsr Sbr_Upd_Price_Flags;
 ```
 
-**New subroutine** - before the comment box of `SbrUpdDtTm` (seq 52500). The
-`IVPMAINT` fields are filled exactly as this program already does for
-`MINQTY`, so the history shows up the same way:
+**New subroutine** - before the comment box of `SbrUpdDtTm` (seq 52500). Every
+`IVPMAINT` field is filled, as P1VBTCHUP and IVRRPCAPL do, so the history shows
+up like any other item field. The date comes from `%Date()` rather than
+`SdsJobDateYY`, which may hold a two-digit year:
 
 ```
        //***********************************************************************
@@ -259,23 +260,36 @@ with:
              Leavesr;
           Endif;
 
-          // One IVPMAINT row per flag changed, as for any item field
-          Mnt_Itmnum    = Scn_Itmnum;
-          Mnt_MaintMM   = SdsJobDateMM;
-          Mnt_MaintDD   = SdsJobDateDD;
-          Mnt_MaintYYYY = SdsJobDateYY;
-          Mnt_MaintWho  = SdsUser;
-          Mnt_RepCode   = 'N';
+          // One IVPMAINT row per flag changed, as for any item field.
+          // Every field is filled, the way P1VBTCHUP and IVRRPCAPL do:
+          // cleared first so nothing is left over from the MINQTY rows
+          // this program writes, and COMMENT names the program.
           If Scn_PrtPrc <> WrkOldPrt;
-             Mnt_Fldnam = 'PRTPRC';
-             Mnt_Before = WrkOldPrt;
-             Mnt_After  = Scn_PrtPrc;
+             Clear IVPMAIN$;
+             Mnt_Itmnum    = Scn_Itmnum;
+             Mnt_Fldnam    = 'PRTPRC';
+             Mnt_MaintYYYY = %Subdt(%Date() : *Y);
+             Mnt_MaintMM   = %Subdt(%Date() : *M);
+             Mnt_MaintDD   = %Subdt(%Date() : *D);
+             Mnt_MaintWho  = SdsUser;
+             Mnt_Before    = WrkOldPrt;
+             Mnt_After     = Scn_PrtPrc;
+             Mnt_RepCode   = 'N';
+             Mnt_Comment   = 'IVRORRMKTC';
              Write IVPMAIN$;
           Endif;
           If Scn_TpAprv <> WrkOldTpa;
-             Mnt_Fldnam = 'TPAPRV';
-             Mnt_Before = WrkOldTpa;
-             Mnt_After  = Scn_TpAprv;
+             Clear IVPMAIN$;
+             Mnt_Itmnum    = Scn_Itmnum;
+             Mnt_Fldnam    = 'TPAPRV';
+             Mnt_MaintYYYY = %Subdt(%Date() : *Y);
+             Mnt_MaintMM   = %Subdt(%Date() : *M);
+             Mnt_MaintDD   = %Subdt(%Date() : *D);
+             Mnt_MaintWho  = SdsUser;
+             Mnt_Before    = WrkOldTpa;
+             Mnt_After     = Scn_TpAprv;
+             Mnt_RepCode   = 'N';
+             Mnt_Comment   = 'IVRORRMKTC';
              Write IVPMAIN$;
           Endif;
 
