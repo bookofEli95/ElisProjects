@@ -1,0 +1,75 @@
+/* ************************************************************************** */
+/* * AICRELCTL2                                                             * */
+/* * AI: Auto release/SD for OEPEDTSWP channels (calls AIRRELCTL2)          * */
+/* ************************************************************************** */
+
+/* ************************************************************************** */
+/* * Program Information                                                    * */
+/* *------------------------------------------------------------------------* */
+/* * Same loop as AICCRTORD, but only releases the OEPEDTSWP channels.      * */
+/* * Runs as its own job (API_RELSWP), independent of AICCRTORD.            * */
+/* ************************************************************************** */
+
+/* ************************************************************************** */
+/* * Program History                                                        * */
+/* *------------------------------------------------------------------------* */
+/* * Project Date     Int Description                                       * */
+/* * ------- -------- --- --------------------------------------------------* */
+/* * FIX     10/07/26 EFI Automate Release - OEPEDTSWP channels             * */
+/* ************************************************************************** */
+
+
+PGM
+
+DCL        VAR(&COUNT) TYPE(*DEC) LEN(4 0) VALUE(1)
+DCL        VAR(&CURTIME) TYPE(*CHAR) LEN(6)
+DCL        VAR(&STRTIME) TYPE(*CHAR) LEN(6) VALUE('083000')
+DCL        VAR(&ENDTIME) TYPE(*CHAR) LEN(6) VALUE('190000')
+DCL        VAR(&BLANK10) TYPE(*CHAR) LEN(10)
+DCL        VAR(&LASTPGM) TYPE(*CHAR) LEN(10)
+DCL        VAR(&NBRCURRCD) TYPE(*DEC) LEN(10)
+
+START:
+RTVSYSVAL  SYSVAL(QTIME) RTNVAR(&CURTIME)
+
+/* check if there is more than one job running; if so, end this one */
+WRKJOB     JOB(API_RELSWP) OUTPUT(*PRINT)
+MONMSG     MSGID(CPF1070) EXEC(DO)
+   GOTO       CMDLBL(EXIT)
+ENDDO
+MONMSG     MSGID(CPF1069)
+DLTSPLF    FILE(QPDSPJOB) SPLNBR(*LAST)
+MONMSG     MSGID(CPF3303 CPF3309)
+
+IF         COND(&CURTIME *GE &STRTIME *AND &CURTIME *LE &ENDTIME) THEN(DO)
+
+/* Wait until no shipping documents job is running */
+RETRY:
+   RTVDTAARA  DTAARA(OEDCTL (35 10)) RTNVAR(&LASTPGM)
+   RTVMBRD    FILE(OEWSD#S) NBRCURRCD(&NBRCURRCD)
+   IF         COND(&NBRCURRCD *GT 0 *OR &LASTPGM *NE &BLANK10) THEN(DO)
+      DLYJOB     DLY(60)
+      GOTO       CMDLBL(RETRY)
+   ENDDO
+
+/* Release and Generate Shipping Documents - OEPEDTSWP channels */
+   IF         COND(&NBRCURRCD *EQ 0 *AND &LASTPGM *EQ &BLANK10) THEN(DO)
+      CALL       PGM(AIRRELCTL2)
+      MONMSG     MSGID(CPF0000 CEE0000 MCH0000 RNX0000)
+   ENDDO
+
+ENDDO
+
+/* delay 15 minutes */
+DLYJOB     DLY(900)
+
+CHGVAR     VAR(&COUNT) VALUE(&COUNT + 1)
+IF         COND(&COUNT *LT 200) THEN(DO)
+   GOTO       CMDLBL(START)
+ENDDO
+
+SBMJOB     CMD(CALL PGM(AICRELCTL2)) JOB(API_RELSWP) JOBQ(AS400) +
+             USER(QPGMR) RTGDTA(NEVER_END) LOG(4 99 *NOLIST) MSGQ(*NONE)
+
+EXIT:
+ENDPGM
