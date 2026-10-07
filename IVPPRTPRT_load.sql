@@ -59,7 +59,9 @@
 -- by this run (CHGUSER 'SOS2092LD') and clears the mark afterwards.
 --
 -- IVPMAINT is filled field for field as P1VBTCHUP and IVRRPCAPL fill
--- it. BEFORE, AFTER and COMMENT are SQL keywords, so they are quoted.
+-- it. MAINTNAME, the full name, says where the change came from - the
+-- person running the load is in MAINTWHO. BEFORE, AFTER and COMMENT
+-- are SQL keywords, so they are quoted.
 -- ====================================================================
 
 -- 1. New rows for listed items with no IVPPRTPRT row yet
@@ -83,11 +85,12 @@ UPDATE IVPPRTPRT P
 -- 3. One history row per item changed by this run
 INSERT INTO IVPMAINT
         (ITMNUM, FLDNAM, MAINTYYYY, MAINTMM, MAINTDD, MAINTWHO,
-         "BEFORE", "AFTER", REPCODE, "COMMENT")
+         "BEFORE", "AFTER", REPCODE, "COMMENT", MAINTNAME)
 SELECT P.ITMNUM, 'PRTPRC',
        YEAR(CURRENT DATE), MONTH(CURRENT DATE), DAY(CURRENT DATE),
        CAST(USER AS CHAR(10)),
-       ' ', 'N', 'N', 'SOS2092'
+       ' ', 'N', 'N', 'SOS2092',
+       'US Print list - SOS-2092 load'
   FROM IVPPRTPRT P
  WHERE P.CHGUSER = 'SOS2092LD';
 

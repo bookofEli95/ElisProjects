@@ -187,6 +187,7 @@ protected in the Milwaukee view (indicator 51) like the other entry fields:
      D WrkPprFnd       S              1A
      D WrkOldPrt       S              1A
      D WrkOldTpa       S              1A
+     D WrkMntName      S            100A   Varying
 ```
 
 **Load** - after `Scn_CodPr272 = Orr_CodPr272;` (seq 19200):
@@ -260,6 +261,14 @@ up like any other item field. The date comes from `%Date()` rather than
              Leavesr;
           Endif;
 
+          // MAINTNAME, the full name, as most history rows carry one:
+          // the user's name from MFPUSERS, or the user ID.
+          WrkMntName = %Trim(SdsUser);
+          Chain SdsUser MFPUSERS;
+          If %Found(MFPUSERS);
+             WrkMntName = %Trim(Usr_UserName);
+          Endif;
+
           // One IVPMAINT row per flag changed, as for any item field.
           // Every field is filled, the way P1VBTCHUP and IVRRPCAPL do:
           // cleared first so nothing is left over from the MINQTY rows
@@ -276,6 +285,7 @@ up like any other item field. The date comes from `%Date()` rather than
              Mnt_After     = Scn_PrtPrc;
              Mnt_RepCode   = 'N';
              Mnt_Comment   = 'IVRORRMKTC';
+             Mnt_MaintName = WrkMntName;
              Write IVPMAIN$;
           Endif;
           If Scn_TpAprv <> WrkOldTpa;
@@ -290,6 +300,7 @@ up like any other item field. The date comes from `%Date()` rather than
              Mnt_After     = Scn_TpAprv;
              Mnt_RepCode   = 'N';
              Mnt_Comment   = 'IVRORRMKTC';
+             Mnt_MaintName = WrkMntName;
              Write IVPMAIN$;
           Endif;
 

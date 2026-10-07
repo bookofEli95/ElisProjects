@@ -1178,6 +1178,15 @@
             MNT_AFTER     = WrkAfter;
             MNT_REPCODE   = 'N';
             MNT_COMMENT   = 'IVRRPCAPL';
+
+            // MAINTNAME, the full name, as most history rows carry one.
+            // No RPG program fills it; the user's name from MFPUSERS,
+            // or the user ID when they are not on it.
+            MNT_MAINTNAME = %Trim(WrkUser);
+            Chain (WrkUser) MFPUSERS;
+            If %Found(MFPUSERS);
+               MNT_MAINTNAME = %Trim(USR_USERNAME);
+            Endif;
             Write IVPMAIN$;
 
          Endsr;
