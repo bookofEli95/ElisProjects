@@ -113,7 +113,11 @@
        //******************
        Begsr Sbr_Swp_Sweep;
 
-         Exec Sql declare cur_Swp cursor for
+         // Skip edit batches already locked for shipping documents
+         // (OEPBCHE 'L'), so a batch still waiting on its SDOC job is not
+         // released twice. INSENSITIVE: rows are fixed at open, so locking
+         // the first keyed batch can't hide the others in the same pass.
+         Exec Sql declare cur_Swp insensitive cursor for
               select b.*
                 from oepbchk b
                   where b.edtb# <> 0
@@ -123,6 +127,10 @@
                         (select ucase(rtrim(s.desc))
                            from oepedtswp s
                           where s.active = 'Y')
+                    and b.edtb# not in
+                        (select e.edtb#
+                           from oepbche e
+                          where e.bchsts = 'L')
               order by b.edtb#;
 
          Exec Sql Open cur_Swp;
