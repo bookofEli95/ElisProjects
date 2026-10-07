@@ -27,17 +27,16 @@
 --
 -- Needs RULSERIES on IVPRPCRUL (CHGPF from the current DDS first).
 --
--- The table is named without a library, so one script serves the test
--- library and production. Say which with DFTRDBCOL:
+-- Writes to the test library, H33979. To load production later,
+-- change H33979. to OBJECT. throughout.
 --
---   RUNSQLSTM SRCSTMF('.../IVPRPCRUL_band_seed.sql') COMMIT(*NONE)
---             NAMING(*SQL) DFTRDBCOL(H33979)
+--   RUNSQLSTM SRCSTMF('.../IVPRPCRUL_band_seed.sql') COMMIT(*NONE) NAMING(*SQL)
 --
--- Left out, SQL naming looks in the schema named after your user
--- profile, which has no IVPRPCRUL, so the insert fails harmlessly.
+-- Every table is keyed UNIQUE: a second run fails on duplicate keys
+-- (SQL0803) and adds nothing.
 -- ====================================================================
 
-INSERT INTO IVPRPCRUL
+INSERT INTO H33979.IVPRPCRUL
         (RULCATG, RULMODEL, RULSCEN, RULSEQ, RULSERIES,
          RULPRCFR, RULPRCTO, RULCHGFR, RULCHGTO,
          RULUPLAMT, RULUPLPCT, RULMINAMT, RULCAPPCT, RULCAPAMT,
@@ -261,7 +260,7 @@ VALUES
 -- Not loaded: series code not confirmed. Check, then load these the
 -- same way (each series also wants its own catch-all row).
 -- ------------------------------------------------------------------
--- INSERT INTO IVPRPCRUL
+-- INSERT INTO H33979.IVPRPCRUL
 --         (RULCATG, RULMODEL, RULSCEN, RULSEQ, RULSERIES,
 --          RULPRCFR, RULPRCTO, RULCHGFR, RULCHGTO,
 --          RULUPLAMT, RULUPLPCT, RULMINAMT, RULCAPPCT, RULCAPAMT,

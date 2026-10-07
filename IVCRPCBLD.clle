@@ -37,12 +37,12 @@
 /* * seeding is a data decision and this is an object build:                * */
 /* *                                                                        * */
 /* *   RUNSQLSTM SRCSTMF('.../IVPRPCCTL_seed.sql') COMMIT(*NONE) +          * */
-/* *             NAMING(*SQL) DFTRDBCOL(H33979)                             * */
+/* *             NAMING(*SQL)                                               * */
 /* *   (the same for IVPRPCRUL_seed.sql, IVPRPCLAD_seed.sql and             * */
 /* *   IVPRPCRUL_band_seed.sql)                                             * */
 /* *                                                                        * */
-/* * The scripts name no library: DFTRDBCOL says which one they load,       * */
-/* * the test library now and OBJECT once confirmed.                        * */
+/* * The scripts write to H33979.<file>. For production, change H33979.     * */
+/* * to OBJECT. in them.                                                    * */
 /* *                                                                        * */
 /* * Every catalogue stays at phase 0 until a control row says otherwise,   * */
 /* * so building and seeding on their own change no prices.                 * */

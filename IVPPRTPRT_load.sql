@@ -6,8 +6,10 @@
 -- row for each, so the change shows in the item's history like any
 -- other field change.
 --
--- The tables are named without a library. Run against the test
--- library first, then production, by saying which with DFTRDBCOL.
+-- Writes to the test library, H33979: IVPPRTPRT, IVPMAINT and the
+-- work table PRTLOAD. Item numbers are checked against production,
+-- OBJECT.IVPITEMS. To load production later, change H33979. to
+-- OBJECT. on the IVPPRTPRT and IVPMAINT lines.
 --
 -- STEP 1 - a work table for the list, one item number per row:
 --
@@ -29,7 +31,7 @@
 --
 --   -- item numbers not on AS400 (send these back to US Print)
 --   SELECT L.ITMNUM FROM H33979.PRTLOAD L
---    WHERE NOT EXISTS (SELECT 1 FROM H33979.IVPITEMS I
+--    WHERE NOT EXISTS (SELECT 1 FROM OBJECT.IVPITEMS I
 --                       WHERE I.ITMNUM = L.ITMNUM);
 --
 --   -- items that already have a printed-price value, which this load
@@ -42,7 +44,7 @@
 -- STEP 4 - load:
 --
 --   RUNSQLSTM SRCSTMF('.../IVPPRTPRT_load.sql') COMMIT(*NONE)
---             NAMING(*SQL) DFTRDBCOL(H33979)
+--             NAMING(*SQL)
 --
 -- What it does, in order:
 --
@@ -65,25 +67,25 @@
 -- ====================================================================
 
 -- 1. New rows for listed items with no IVPPRTPRT row yet
-INSERT INTO IVPPRTPRT
+INSERT INTO H33979.IVPPRTPRT
         (ITMNUM, PRTPRC, TPAPRV, ADDTS, ADDUSER, CHGTS, CHGUSER)
 SELECT DISTINCT L.ITMNUM, 'N', ' ',
        CURRENT TIMESTAMP, 'SOS2092',
        CURRENT TIMESTAMP, 'SOS2092LD'
-  FROM PRTLOAD L
- WHERE EXISTS (SELECT 1 FROM IVPITEMS I WHERE I.ITMNUM = L.ITMNUM)
-   AND NOT EXISTS (SELECT 1 FROM IVPPRTPRT P WHERE P.ITMNUM = L.ITMNUM);
+  FROM H33979.PRTLOAD L
+ WHERE EXISTS (SELECT 1 FROM OBJECT.IVPITEMS I WHERE I.ITMNUM = L.ITMNUM)
+   AND NOT EXISTS (SELECT 1 FROM H33979.IVPPRTPRT P WHERE P.ITMNUM = L.ITMNUM);
 
 -- 2. Existing rows still blank (not known) become 'N'
-UPDATE IVPPRTPRT P
+UPDATE H33979.IVPPRTPRT P
    SET PRTPRC  = 'N',
        CHGTS   = CURRENT TIMESTAMP,
        CHGUSER = 'SOS2092LD'
  WHERE P.PRTPRC = ' '
-   AND P.ITMNUM IN (SELECT ITMNUM FROM PRTLOAD);
+   AND P.ITMNUM IN (SELECT ITMNUM FROM H33979.PRTLOAD);
 
 -- 3. One history row per item changed by this run
-INSERT INTO IVPMAINT
+INSERT INTO H33979.IVPMAINT
         (ITMNUM, FLDNAM, MAINTYYYY, MAINTMM, MAINTDD, MAINTWHO,
          "BEFORE", "AFTER", REPCODE, "COMMENT", MAINTNAME)
 SELECT P.ITMNUM, 'PRTPRC',
@@ -91,10 +93,10 @@ SELECT P.ITMNUM, 'PRTPRC',
        CAST(USER AS CHAR(10)),
        ' ', 'N', 'N', 'SOS2092',
        'US Print list - SOS-2092 load'
-  FROM IVPPRTPRT P
+  FROM H33979.IVPPRTPRT P
  WHERE P.CHGUSER = 'SOS2092LD';
 
 -- 4. Clear the run marker, so a second run writes no more history
-UPDATE IVPPRTPRT
+UPDATE H33979.IVPPRTPRT
    SET CHGUSER = 'SOS2092'
  WHERE CHGUSER = 'SOS2092LD';

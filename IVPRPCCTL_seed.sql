@@ -78,7 +78,8 @@
 --              the same day, or IVRORRNWPR can copy a 2022 price into
 --              NEWPRICE for a title reaching the queue before the next
 --              monthly run:
---                DELETE FROM OBJECT.IVPORRPRCU WHERE DIVCAT = <catalogue>
+--                DELETE FROM H33979.IVPORRPRCU WHERE DIVCAT = <catalogue>
+--              (in test; OBJECT.IVPORRPRCU once it goes live)
 --              Once every catalogue is on, the file is empty and
 --              IVRORRNWPR has nothing left to do.
 --
@@ -107,19 +108,16 @@
 -- ago is indistinguishable from one never repriced, and both land on
 -- the oldest bracket. Confirm IVPMAINT retention before phase 2.
 --
--- The table is named without a library, so this script loads the test
--- library or production. Say which with DFTRDBCOL:
+-- Writes to the test library, H33979. To load production later,
+-- change H33979. to OBJECT. throughout.
 --
---   RUNSQLSTM SRCSTMF('.../IVPRPCCTL_seed.sql') COMMIT(*NONE)
---             NAMING(*SQL) DFTRDBCOL(H33979)
+--   RUNSQLSTM SRCSTMF('.../IVPRPCCTL_seed.sql') COMMIT(*NONE) NAMING(*SQL)
 --
--- Left out, SQL naming looks in the schema named after your user
--- profile, which has no such table, so the insert fails harmlessly.
 -- Every table is keyed UNIQUE: a second run fails on duplicate keys
 -- (SQL0803) and adds nothing.
 -- ====================================================================
 
-INSERT INTO IVPRPCCTL
+INSERT INTO H33979.IVPRPCCTL
         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
          RPCELGMO, RPCHORIZ, RPCEXPCY,
          RPCCNOYN, RPCAUTACT,
@@ -138,7 +136,7 @@ VALUES
 -- placeholder: the AS400 catalogue -> catalogue group mapping still
 -- has to come from Content, so no real DIVCAT is seeded here.
 -- ------------------------------------------------------------------
--- INSERT INTO IVPRPCCTL
+-- INSERT INTO H33979.IVPRPCCTL
 --         (DIVCAT, RPCCATG, RPCPHASE, RPCMODEL, RPCSCEN,
 --          RPCELGMO, RPCHORIZ, RPCEXPCY,
 --          RPCCNOYN, RPCAUTACT,

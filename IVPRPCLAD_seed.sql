@@ -12,19 +12,16 @@
 -- the rule percentage, so an octavo moves one or more rungs rather than
 -- to an arbitrary .99 price. LADSEQ must ascend with LADPRICE.
 --
--- The table is named without a library, so this script loads the test
--- library or production. Say which with DFTRDBCOL:
+-- Writes to the test library, H33979. To load production later,
+-- change H33979. to OBJECT. throughout.
 --
---   RUNSQLSTM SRCSTMF('.../IVPRPCLAD_seed.sql') COMMIT(*NONE)
---             NAMING(*SQL) DFTRDBCOL(H33979)
+--   RUNSQLSTM SRCSTMF('.../IVPRPCLAD_seed.sql') COMMIT(*NONE) NAMING(*SQL)
 --
--- Left out, SQL naming looks in the schema named after your user
--- profile, which has no such table, so the insert fails harmlessly.
 -- Every table is keyed UNIQUE: a second run fails on duplicate keys
 -- (SQL0803) and adds nothing.
 -- ====================================================================
 
-INSERT INTO IVPRPCLAD
+INSERT INTO H33979.IVPRPCLAD
         (LADCATG, LADSEQ, LADPRICE, LADMNTTS, LADMNTWHO)
 VALUES
   ('CHO',  10, 2.10, CURRENT TIMESTAMP, 'SEED'),
