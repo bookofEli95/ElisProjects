@@ -1,5 +1,5 @@
 /* ************************************************************************** */
-/* * AICRELCTL2                                                             * */
+/* * AICCRTORD2                                                             * */
 /* * AI: Auto release/SD for OEPEDTSWP channels (calls AIRRELCTL2)          * */
 /* ************************************************************************** */
 
@@ -68,7 +68,7 @@ IF         COND(&COUNT *LT 200) THEN(DO)
    GOTO       CMDLBL(START)
 ENDDO
 
-SBMJOB     CMD(CALL PGM(AICRELCTL2)) JOB(API_RELSWP) JOBQ(AS400) +
+SBMJOB     CMD(CALL PGM(AICCRTORD2)) JOB(API_RELSWP) JOBQ(AS400) +
              USER(QPGMR) RTGDTA(NEVER_END) LOG(4 99 *NOLIST) MSGQ(*NONE)
 
 EXIT:
