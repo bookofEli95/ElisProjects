@@ -13,7 +13,8 @@
 -- The item list is the HL ID column from Oct_Nov_2026_Willis_titles.xlsx and
 -- is matched against both the print and the digital side of each link.
 -- Files are qualified with OBJECT. Willis licences are read through
--- OBJECT.IVLPROD2WL, the logical over WL_ROY the refresh programs use.
+-- OBJECT.IVLPROD2, the logical the refresh programs use for the main
+-- data, which is where the WILLIS / WILLISUK lines are.
 
 -- 1. Linked Willis digital items and whether the 1 October run refreshed them
 WITH WILLIS (ITMNUM) AS (
@@ -50,11 +51,10 @@ SELECT L.KIND,
  ORDER BY L.KIND, L.PRINT_ITEM, L.DIGITAL_ITEM;
 
 
--- 2. Willis product licence lines now on those digital items (WL_ROY), side by
---    side with the print item's lines they were copied from. After the 1 October
---    run the rates should match; any line where Royalties agreed a different
---    digital rate needs correcting (after the item is exempt, see below).
---    Read through IVLPROD2WL, the logical the refresh programs use for WL_ROY.
+-- 2. Product licence lines now on those digital items (main data, where the
+--    WILLIS / WILLISUK lines are), side by
+--    side with the print item's lines they were copied from. Until digital
+--    rates go live they match; afterwards WILLISUK lines show 50.000% G.
 WITH LINKS (KIND, PRINT_ITEM, DIGITAL_ITEM) AS (
     SELECT 'EBOOK', ORGITMNUM, ITMNUM FROM OBJECT.IVPEPUBITM
     UNION ALL
@@ -62,12 +62,12 @@ WITH LINKS (KIND, PRINT_ITEM, DIGITAL_ITEM) AS (
 )
 SELECT L.KIND, L.PRINT_ITEM, L.DIGITAL_ITEM,
        D.STMTID, D.CNTRID, D.PLCODE, D.TERR,
-       P.DSPCRT AS PRINT_RATE_SHOWN,   P.PAYRAT AS PRINT_PAYRAT,
-       D.DSPCRT AS DIGITAL_RATE_SHOWN, D.PAYRAT AS DIGITAL_PAYRAT
+       P.DSPCRT AS PRINT_RATE_SHOWN,   P.PAYRTF AS PRINT_BASIS,
+       D.DSPCRT AS DIGITAL_RATE_SHOWN, D.PAYRTF AS DIGITAL_BASIS
   FROM LINKS L
-  JOIN OBJECT.IVLPROD2WL D
+  JOIN OBJECT.IVLPROD2 D
     ON D.ITMNUM = L.DIGITAL_ITEM
-  LEFT JOIN OBJECT.IVLPROD2WL P
+  LEFT JOIN OBJECT.IVLPROD2 P
     ON P.ITMNUM = L.PRINT_ITEM
    AND P.STMTID = D.STMTID AND P.PLCODE = D.PLCODE
    AND P.COMP#  = D.COMP#  AND P.TERSEQ = D.TERSEQ AND P.TERR = D.TERR
@@ -98,14 +98,13 @@ VALUES
        (910974), (1872231), (406230), (14076834), (14076762), (14076747), (14076767), (14076768),
        (14076819)
 )
---    PAYRAT is "calculated": if it changes with CODPR172 (code price) for the
---    same DSPCRT, it is a per-unit amount, not a straight rate, and RLPDGTRAT
---    cannot hold one fixed PAYRAT per contract - check before go-live.
+--    PAYRAT is a straight rate held as a fraction (0.15000 = 15%); PAYRTF is
+--    the basis ('%' retail, 'G' gross receipts, 'F' flat).
 SELECT P.CNTRID, P.STMTID, P.PLCODE, P.DSPCRT, P.PAYRTF, P.PAYRAT,
        MIN(P.CODPR172) AS MIN_CODE_PRICE,
        MAX(P.CODPR172) AS MAX_CODE_PRICE,
        COUNT(DISTINCT P.ITMNUM) AS PRINT_ITEMS
-  FROM OBJECT.IVLPROD2WL P
+  FROM OBJECT.IVLPROD2 P
   JOIN WILLIS W
     ON W.ITMNUM = P.ITMNUM
  GROUP BY P.CNTRID, P.STMTID, P.PLCODE, P.DSPCRT, P.PAYRTF, P.PAYRAT

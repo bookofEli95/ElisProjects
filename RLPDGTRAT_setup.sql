@@ -17,11 +17,10 @@
 -- digital items that already exist.
 --
 -- The rate columns mirror RLPPROD:
---   PAYRAT  Pay rate          DEC(7,5)
---   PAYRTF  'F' if PAYRAT is a flat amount
+--   PAYRAT  Pay rate as a fraction, DEC(7,5): 0.50000 = 50%
+--   PAYRTF  Basis: '%' retail, 'G' gross receipts, 'F' flat
 --   DSPCRT  Contract rate as displayed (alpha)
--- Enter them exactly as a gross-receipts line is stored today
--- (step 0 shows how) before go-live.
+-- PAYRTF holds the basis: '%' retail, 'G' gross receipts, 'F' flat.
 --
 -- Run step 1 BEFORE compiling the new RLREBKADPR.
 --=============================================================
@@ -80,7 +79,7 @@ LABEL ON COLUMN OBJECT.RLPDGTRAT (
    STMTID   IS 'Statement ID (payee)',
    CNTRID   IS 'Contract ID, blank = all contracts',
    PAYRAT   IS 'Digital pay rate',
-   PAYRTF   IS '"F" if PAYRAT is flat',
+   PAYRTF   IS 'Basis: % retail G gross F flat',
    DSPCRT   IS 'Digital rate displayed (alpha)'
 );
 
@@ -91,18 +90,19 @@ LABEL ON INDEX OBJECT.RLLDGTRAT IS
    'RL-Digital rates by lib, payee, contract';
 
 --------------------------------------------------------------
--- 2. WILLISUK: 50 on gross receipts for every digital item.
---    The licence lines carry no contract (blank on RLRMPL), so
---    one row with a blank CNTRID covers them all. Only the
---    WILLISUK line changes; the WILLIS (WE WORLD) line keeps
---    the print rate. Replace the ??? with how step 0 stores
---    50 G, and use 'HL' instead of 'WL' if step 0a shows the
---    lines under HL rather than WL.
+-- 2. WILLISUK: 50% of gross receipts on every digital item.
+--    Step 0 showed how a licence line stores this:
+--      PAYRAT 0.50000 (a fraction, not 50)
+--      PAYRTF 'G'     ('%' = retail, 'G' = gross receipts, 'F' = flat)
+--      DSPCRT ' 50.000%' (as the 2 existing 50 G lines show it)
+--    and that the WILLISUK lines are in the main data (HL), with
+--    a blank contract, so one 'HL' row with a blank CNTRID
+--    covers them all. The WILLIS (WE WORLD) line is untouched.
 --------------------------------------------------------------
--- INSERT INTO OBJECT.RLPDGTRAT
---        (ROYLIB, STMTID, CNTRID, PAYRAT, PAYRTF, DSPCRT, COMT40)
--- VALUES ('WL', 'WILLISUK', '', ???, '?', '????????',
---         'Willis digital - 50 gross receipts');
+INSERT INTO OBJECT.RLPDGTRAT
+       (ROYLIB, STMTID, CNTRID, PAYRAT, PAYRTF, DSPCRT, COMT40)
+VALUES ('HL', 'WILLISUK', '', 0.50000, 'G', ' 50.000%',
+        'Willis digital - 50% of gross receipts');
 
 --------------------------------------------------------------
 -- 3. After the run: WILLISUK lines on digital items, next to
@@ -115,13 +115,13 @@ WITH LINKS (KIND, PRINT_ITEM, DIGITAL_ITEM) AS (
 )
 SELECT L.KIND, L.PRINT_ITEM, L.DIGITAL_ITEM,
        D.STMTID, D.CNTRID, D.PLCODE,
-       P.DSPCRT AS PRINT_RATE_SHOWN,   P.PAYRAT AS PRINT_PAYRAT,
-       D.DSPCRT AS DIGITAL_RATE_SHOWN, D.PAYRAT AS DIGITAL_PAYRAT
+       P.DSPCRT AS PRINT_RATE_SHOWN,   P.PAYRTF AS PRINT_BASIS,
+       D.DSPCRT AS DIGITAL_RATE_SHOWN, D.PAYRTF AS DIGITAL_BASIS
   FROM LINKS L
-  JOIN OBJECT.IVLPROD2WL D
+  JOIN OBJECT.IVLPROD2 D
     ON D.ITMNUM = L.DIGITAL_ITEM
    AND D.STMTID = 'WILLISUK'
-  LEFT JOIN OBJECT.IVLPROD2WL P
+  LEFT JOIN OBJECT.IVLPROD2 P
     ON P.ITMNUM = L.PRINT_ITEM
    AND P.STMTID = D.STMTID AND P.PLCODE = D.PLCODE
    AND P.COMP#  = D.COMP#  AND P.TERSEQ = D.TERSEQ AND P.TERR = D.TERR
