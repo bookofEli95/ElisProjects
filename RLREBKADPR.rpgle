@@ -8,8 +8,8 @@
        // Program Information
        //-----------------------------------------------------------------------
        // Add Ebooks to selected files.
-       // A licence line whose contract has a digital rate in RLPDGTRAT gets
-       // that rate instead of the print item's.
+       // A licence line whose payee (STMTID) has a digital rate in RLPDGTRAT
+       // gets that rate instead of the print item's.
        //***********************************************************************
 
        //***********************************************************************
@@ -17,8 +17,8 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
-       // HXXXXX  10/06/26 EFI Use the contract's digital rate from RLPDGTRAT
-       //                      on copied licence lines when one is set up
+       // HXXXXX  10/08/26 EFI Use the payee's digital rate from RLPDGTRAT on
+       //                      copied licence lines when one is set up
        // MISC3   04/12/16 SRK Remove /Free - /End-Free
        // MISC3   08/04/15 SMM Code review errors
        // H2495   10/12/12 SMM Fix the Standards error "Prototype for Program Ne
@@ -64,6 +64,10 @@
        // Work Variables
      D WrkOrgItmnum    S                   Like(Hal_Itmnum)
      D WrkEbkItmnum    S                   Like(Hal_Itmnum)
+     D WrkRoyLib       S              2A
+     D WrkStmtid       S                   Like(Hal_Stmtid)
+     D WrkCntrid       S                   Like(Hal_Cntrid)
+     D WrkDgtFound     S               N
 
        //***********************************************************************
        //* Main Line *
@@ -79,9 +83,12 @@
              Leave;
           Endif;
           Hal_Itmnum = WrkEbkItmnum;
-          // Digital rate for this contract, if one is set up
-          Chain ('HL' : Hal_Cntrid : Hal_Plcode) RLLDGTRAT;
-          If %Found(RLLDGTRAT);
+          // Digital rate for this payee, if one is set up
+          WrkRoyLib = 'HL';
+          WrkStmtid = Hal_Stmtid;
+          WrkCntrid = Hal_Cntrid;
+          Exsr Sbr_Digital_Rate;
+          If WrkDgtFound;
              Hal_Payrat = Dgr_Payrat;
              Hal_Payrtf = Dgr_Payrtf;
              Hal_Dspcrt = Dgr_Dspcrt;
@@ -97,9 +104,12 @@
              Leave;
           Endif;
           Am2_Itmnum = WrkEbkItmnum;
-          // Digital rate for this contract, if one is set up
-          Chain ('AM' : Am2_Cntrid : Am2_Plcode) RLLDGTRAT;
-          If %Found(RLLDGTRAT);
+          // Digital rate for this payee, if one is set up
+          WrkRoyLib = 'AM';
+          WrkStmtid = Am2_Stmtid;
+          WrkCntrid = Am2_Cntrid;
+          Exsr Sbr_Digital_Rate;
+          If WrkDgtFound;
              Am2_Payrat = Dgr_Payrat;
              Am2_Payrtf = Dgr_Payrtf;
              Am2_Dspcrt = Dgr_Dspcrt;
@@ -115,9 +125,12 @@
              Leave;
           Endif;
           Ap2_Itmnum = WrkEbkItmnum;
-          // Digital rate for this contract, if one is set up
-          Chain ('AP' : Ap2_Cntrid : Ap2_Plcode) RLLDGTRAT;
-          If %Found(RLLDGTRAT);
+          // Digital rate for this payee, if one is set up
+          WrkRoyLib = 'AP';
+          WrkStmtid = Ap2_Stmtid;
+          WrkCntrid = Ap2_Cntrid;
+          Exsr Sbr_Digital_Rate;
+          If WrkDgtFound;
              Ap2_Payrat = Dgr_Payrat;
              Ap2_Payrtf = Dgr_Payrtf;
              Ap2_Dspcrt = Dgr_Dspcrt;
@@ -133,9 +146,12 @@
              Leave;
           Endif;
           At2_Itmnum = WrkEbkItmnum;
-          // Digital rate for this contract, if one is set up
-          Chain ('AT' : At2_Cntrid : At2_Plcode) RLLDGTRAT;
-          If %Found(RLLDGTRAT);
+          // Digital rate for this payee, if one is set up
+          WrkRoyLib = 'AT';
+          WrkStmtid = At2_Stmtid;
+          WrkCntrid = At2_Cntrid;
+          Exsr Sbr_Digital_Rate;
+          If WrkDgtFound;
              At2_Payrat = Dgr_Payrat;
              At2_Payrtf = Dgr_Payrtf;
              At2_Dspcrt = Dgr_Dspcrt;
@@ -151,9 +167,12 @@
              Leave;
           Endif;
           Cl2_Itmnum = WrkEbkItmnum;
-          // Digital rate for this contract, if one is set up
-          Chain ('CL' : Cl2_Cntrid : Cl2_Plcode) RLLDGTRAT;
-          If %Found(RLLDGTRAT);
+          // Digital rate for this payee, if one is set up
+          WrkRoyLib = 'CL';
+          WrkStmtid = Cl2_Stmtid;
+          WrkCntrid = Cl2_Cntrid;
+          Exsr Sbr_Digital_Rate;
+          If WrkDgtFound;
              Cl2_Payrat = Dgr_Payrat;
              Cl2_Payrtf = Dgr_Payrtf;
              Cl2_Dspcrt = Dgr_Dspcrt;
@@ -169,9 +188,12 @@
              Leave;
           Endif;
           Tm2_Itmnum = WrkEbkItmnum;
-          // Digital rate for this contract, if one is set up
-          Chain ('TM' : Tm2_Cntrid : Tm2_Plcode) RLLDGTRAT;
-          If %Found(RLLDGTRAT);
+          // Digital rate for this payee, if one is set up
+          WrkRoyLib = 'TM';
+          WrkStmtid = Tm2_Stmtid;
+          WrkCntrid = Tm2_Cntrid;
+          Exsr Sbr_Digital_Rate;
+          If WrkDgtFound;
              Tm2_Payrat = Dgr_Payrat;
              Tm2_Payrtf = Dgr_Payrtf;
              Tm2_Dspcrt = Dgr_Dspcrt;
@@ -187,9 +209,12 @@
              Leave;
           Endif;
           Wl2_Itmnum = WrkEbkItmnum;
-          // Digital rate for this contract, if one is set up
-          Chain ('WL' : Wl2_Cntrid : Wl2_Plcode) RLLDGTRAT;
-          If %Found(RLLDGTRAT);
+          // Digital rate for this payee, if one is set up
+          WrkRoyLib = 'WL';
+          WrkStmtid = Wl2_Stmtid;
+          WrkCntrid = Wl2_Cntrid;
+          Exsr Sbr_Digital_Rate;
+          If WrkDgtFound;
              Wl2_Payrat = Dgr_Payrat;
              Wl2_Payrtf = Dgr_Payrtf;
              Wl2_Dspcrt = Dgr_Dspcrt;
@@ -202,6 +227,23 @@
        //*****************
        //* End Main Line *
        //***********************************************************************
+
+       //***********************************************************************
+       //* Digital rate for a payee **
+       //******************************
+       // Looks up WrkRoyLib/WrkStmtid/WrkCntrid in RLPDGTRAT. A row for the
+       // exact contract wins; otherwise a row with a blank contract applies
+       // to every contract for that payee.
+       Begsr Sbr_Digital_Rate;
+
+          Chain (WrkRoyLib : WrkStmtid : WrkCntrid) RLLDGTRAT;
+          If Not %Found(RLLDGTRAT);
+             WrkCntrid = *Blanks;
+             Chain (WrkRoyLib : WrkStmtid : WrkCntrid) RLLDGTRAT;
+          Endif;
+          WrkDgtFound = %Found(RLLDGTRAT);
+
+       Endsr;
 
        //***********************************************************************
        //* Setup **
