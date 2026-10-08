@@ -14,12 +14,6 @@
 -- through one run first, then exempt it and correct its rates.
 --
 -- Run steps 1 and 2 BEFORE compiling the four programs.
---
--- LATER - once digital rates come from the contract (RLPDGTRAT),
--- take the Willis items back off so they follow print again
--- (except for the rate). Do not run until then:
---   DELETE FROM OBJECT.RLPDGTEXC
---    WHERE COMT40 LIKE 'WILLIS - until digital rates live%';
 --=============================================================
 
 --------------------------------------------------------------
@@ -58,29 +52,7 @@ INSERT INTO OBJECT.RLPDGTEXC (ITMNUM, COMT40) VALUES
    (318385, 'Was hard-coded in RLREBKUPD (per Karla)');
 
 --------------------------------------------------------------
--- 3. Willis digital items, until digital rates are applied
---    automatically from the contract (RLPDGTRAT).
---    eBooks found by Willis_digital_1Oct_check.sql query 1;
---    add the Willis downloads once query 1 has been re-run.
---    Royalties correct the rates only AFTER this insert.
---------------------------------------------------------------
-INSERT INTO OBJECT.RLPDGTEXC (ITMNUM, COMT40) VALUES
-   (1827066, 'WILLIS - until digital rates live'),
-   (1827067, 'WILLIS - until digital rates live'),
-   (1869588, 'WILLIS - until digital rates live'),
-   (1869589, 'WILLIS - until digital rates live'),
-   (1938568, 'WILLIS - until digital rates live'),
-   (1938569, 'WILLIS - until digital rates live'),
-   (2247867, 'WILLIS - until digital rates live'),
-   (2247868, 'WILLIS - until digital rates live'),
-   (2247869, 'WILLIS - until digital rates live'),
-   (2375717, 'WILLIS - until digital rates live'),
-   (2376162, 'WILLIS - until digital rates live'),
-   (2377552, 'WILLIS - until digital rates live'),
-   (2377788, 'WILLIS - until digital rates live');
-
---------------------------------------------------------------
--- 4. Check what is exempt
+-- 3. Check what is exempt
 --------------------------------------------------------------
 SELECT E.ITMNUM, I.SDESC, E.COMT40, E.USERID, E.DTEADDED
   FROM OBJECT.RLPDGTEXC E
