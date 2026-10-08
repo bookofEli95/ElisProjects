@@ -12,7 +12,8 @@
 --
 -- The item list is the HL ID column from Oct_Nov_2026_Willis_titles.xlsx and
 -- is matched against both the print and the digital side of each link.
--- Files are qualified with OBJECT (WL_ROY for the Willis licences).
+-- Files are qualified with OBJECT. Willis licences are read through
+-- OBJECT.IVLPROD2WL, the logical over WL_ROY the refresh programs use.
 
 -- 1. Linked Willis digital items and whether the 1 October run refreshed them
 WITH WILLIS (ITMNUM) AS (
@@ -53,7 +54,7 @@ SELECT L.KIND,
 --    side with the print item's lines they were copied from. After the 1 October
 --    run the rates should match; any line where Royalties agreed a different
 --    digital rate needs correcting (after the item is exempt, see below).
---    WL_ROY.RLPPROD is assumed to be the physical file behind IVLPROD2WL.
+--    Read through IVLPROD2WL, the logical the refresh programs use for WL_ROY.
 WITH LINKS (KIND, PRINT_ITEM, DIGITAL_ITEM) AS (
     SELECT 'EBOOK', ORGITMNUM, ITMNUM FROM OBJECT.IVPEPUBITM
     UNION ALL
@@ -64,9 +65,9 @@ SELECT L.KIND, L.PRINT_ITEM, L.DIGITAL_ITEM,
        P.DSPCRT AS PRINT_RATE_SHOWN,   P.PAYRAT AS PRINT_PAYRAT,
        D.DSPCRT AS DIGITAL_RATE_SHOWN, D.PAYRAT AS DIGITAL_PAYRAT
   FROM LINKS L
-  JOIN WL_ROY.RLPPROD D
+  JOIN OBJECT.IVLPROD2WL D
     ON D.ITMNUM = L.DIGITAL_ITEM
-  LEFT JOIN WL_ROY.RLPPROD P
+  LEFT JOIN OBJECT.IVLPROD2WL P
     ON P.ITMNUM = L.PRINT_ITEM
    AND P.STMTID = D.STMTID AND P.PLCODE = D.PLCODE
    AND P.COMP#  = D.COMP#  AND P.TERSEQ = D.TERSEQ AND P.TERR = D.TERR
@@ -104,7 +105,7 @@ SELECT P.CNTRID, P.STMTID, P.PLCODE, P.DSPCRT, P.PAYRTF, P.PAYRAT,
        MIN(P.CODPR172) AS MIN_CODE_PRICE,
        MAX(P.CODPR172) AS MAX_CODE_PRICE,
        COUNT(DISTINCT P.ITMNUM) AS PRINT_ITEMS
-  FROM WL_ROY.RLPPROD P
+  FROM OBJECT.IVLPROD2WL P
   JOIN WILLIS W
     ON W.ITMNUM = P.ITMNUM
  GROUP BY P.CNTRID, P.STMTID, P.PLCODE, P.DSPCRT, P.PAYRTF, P.PAYRAT

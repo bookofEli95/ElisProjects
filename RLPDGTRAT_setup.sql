@@ -29,29 +29,30 @@
 --------------------------------------------------------------
 -- 0. How is the rate basis (% / G) stored? RLRMPL shows
 --    "15.00000 %" on the WILLISUK line of 1827066. Two checks:
---    a) every line of 1827066, raw, in both libraries;
+--    a) every line of 1827066, raw, in HL (IVLPROD2) and WL
+--       (IVLPROD2WL, over WL_ROY);
 --    b) every PAYRTF / DSPCRT combination in use - the one that
 --       holds G for gross receipts is what step 2 needs.
 --------------------------------------------------------------
-SELECT 'OBJECT' AS LIB, STMTID, CNTRID, PLCODE, TERR, COMP#,
+SELECT 'HL' AS LIB, STMTID, CNTRID, PLCODE, TERR, COMP#,
        PAYRAT, PAYRTF, DSPCRT, FGNRAT, USERID
-  FROM OBJECT.RLPPROD
+  FROM OBJECT.IVLPROD2
  WHERE ITMNUM = 1827066
 UNION ALL
-SELECT 'WL_ROY', STMTID, CNTRID, PLCODE, TERR, COMP#,
+SELECT 'WL', STMTID, CNTRID, PLCODE, TERR, COMP#,
        PAYRAT, PAYRTF, DSPCRT, FGNRAT, USERID
-  FROM WL_ROY.RLPPROD
+  FROM OBJECT.IVLPROD2WL
  WHERE ITMNUM = 1827066
  ORDER BY LIB, STMTID;
 
-SELECT 'OBJECT' AS LIB, PAYRTF, DSPCRT, COUNT(*) AS LINES,
+SELECT 'HL' AS LIB, PAYRTF, DSPCRT, COUNT(*) AS LINES,
        MIN(PAYRAT) AS MIN_PAYRAT, MAX(PAYRAT) AS MAX_PAYRAT
-  FROM OBJECT.RLPPROD
+  FROM OBJECT.IVLPROD2
  GROUP BY PAYRTF, DSPCRT
 UNION ALL
-SELECT 'WL_ROY', PAYRTF, DSPCRT, COUNT(*),
+SELECT 'WL', PAYRTF, DSPCRT, COUNT(*),
        MIN(PAYRAT), MAX(PAYRAT)
-  FROM WL_ROY.RLPPROD
+  FROM OBJECT.IVLPROD2WL
  GROUP BY PAYRTF, DSPCRT
  ORDER BY LIB, LINES DESC;
 
@@ -96,7 +97,7 @@ LABEL ON INDEX OBJECT.RLLDGTRAT IS
 --    WILLISUK line changes; the WILLIS (WE WORLD) line keeps
 --    the print rate. Replace the ??? with how step 0 stores
 --    50 G, and use 'HL' instead of 'WL' if step 0a shows the
---    lines in OBJECT rather than WL_ROY.
+--    lines under HL rather than WL.
 --------------------------------------------------------------
 -- INSERT INTO OBJECT.RLPDGTRAT
 --        (ROYLIB, STMTID, CNTRID, PAYRAT, PAYRTF, DSPCRT, COMT40)
@@ -117,10 +118,10 @@ SELECT L.KIND, L.PRINT_ITEM, L.DIGITAL_ITEM,
        P.DSPCRT AS PRINT_RATE_SHOWN,   P.PAYRAT AS PRINT_PAYRAT,
        D.DSPCRT AS DIGITAL_RATE_SHOWN, D.PAYRAT AS DIGITAL_PAYRAT
   FROM LINKS L
-  JOIN WL_ROY.RLPPROD D
+  JOIN OBJECT.IVLPROD2WL D
     ON D.ITMNUM = L.DIGITAL_ITEM
    AND D.STMTID = 'WILLISUK'
-  LEFT JOIN WL_ROY.RLPPROD P
+  LEFT JOIN OBJECT.IVLPROD2WL P
     ON P.ITMNUM = L.PRINT_ITEM
    AND P.STMTID = D.STMTID AND P.PLCODE = D.PLCODE
    AND P.COMP#  = D.COMP#  AND P.TERSEQ = D.TERSEQ AND P.TERR = D.TERR
