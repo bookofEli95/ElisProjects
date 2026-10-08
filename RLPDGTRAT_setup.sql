@@ -27,31 +27,33 @@
 --=============================================================
 
 --------------------------------------------------------------
--- 0. How is a gross-receipts ("G") rate stored on a licence
---    line, and where do WILLISUK lines live? Use the result to
---    fill in step 2.
+-- 0. How is the rate basis (% / G) stored? RLRMPL shows
+--    "15.00000 %" on the WILLISUK line of 1827066. Two checks:
+--    a) every line of 1827066, raw, in both libraries;
+--    b) every PAYRTF / DSPCRT combination in use - the one that
+--       holds G for gross receipts is what step 2 needs.
 --------------------------------------------------------------
-SELECT 'OBJECT' AS LIB, DSPCRT, PAYRTF, PAYRAT, COUNT(*) AS LINES
+SELECT 'OBJECT' AS LIB, STMTID, CNTRID, PLCODE, TERR, COMP#,
+       PAYRAT, PAYRTF, DSPCRT, FGNRAT, USERID
   FROM OBJECT.RLPPROD
- WHERE DSPCRT LIKE '%G%'
- GROUP BY DSPCRT, PAYRTF, PAYRAT
+ WHERE ITMNUM = 1827066
 UNION ALL
-SELECT 'WL_ROY', DSPCRT, PAYRTF, PAYRAT, COUNT(*)
+SELECT 'WL_ROY', STMTID, CNTRID, PLCODE, TERR, COMP#,
+       PAYRAT, PAYRTF, DSPCRT, FGNRAT, USERID
   FROM WL_ROY.RLPPROD
- WHERE DSPCRT LIKE '%G%'
- GROUP BY DSPCRT, PAYRTF, PAYRAT
- ORDER BY LINES DESC;
+ WHERE ITMNUM = 1827066
+ ORDER BY LIB, STMTID;
 
-SELECT 'OBJECT' AS LIB, STMTID, CNTRID, DSPCRT, PAYRTF, PAYRAT, COUNT(*) AS LINES
+SELECT 'OBJECT' AS LIB, PAYRTF, DSPCRT, COUNT(*) AS LINES,
+       MIN(PAYRAT) AS MIN_PAYRAT, MAX(PAYRAT) AS MAX_PAYRAT
   FROM OBJECT.RLPPROD
- WHERE STMTID = 'WILLISUK'
- GROUP BY STMTID, CNTRID, DSPCRT, PAYRTF, PAYRAT
+ GROUP BY PAYRTF, DSPCRT
 UNION ALL
-SELECT 'WL_ROY', STMTID, CNTRID, DSPCRT, PAYRTF, PAYRAT, COUNT(*)
+SELECT 'WL_ROY', PAYRTF, DSPCRT, COUNT(*),
+       MIN(PAYRAT), MAX(PAYRAT)
   FROM WL_ROY.RLPPROD
- WHERE STMTID = 'WILLISUK'
- GROUP BY STMTID, CNTRID, DSPCRT, PAYRTF, PAYRAT
- ORDER BY LIB, CNTRID, LINES DESC;
+ GROUP BY PAYRTF, DSPCRT
+ ORDER BY LIB, LINES DESC;
 
 --------------------------------------------------------------
 -- 1. Digital rate table and the keyed index RLREBKADPR reads
@@ -88,10 +90,13 @@ LABEL ON INDEX OBJECT.RLLDGTRAT IS
    'RL-Digital rates by lib, payee, contract';
 
 --------------------------------------------------------------
--- 2. WILLISUK: 50 on gross receipts for every digital item,
---    all contracts. Replace the ??? with the PAYRAT / PAYRTF /
---    DSPCRT a 50 G line has in step 0. Add a 'HL' row too if
---    step 0 shows WILLISUK lines in OBJECT.
+-- 2. WILLISUK: 50 on gross receipts for every digital item.
+--    The licence lines carry no contract (blank on RLRMPL), so
+--    one row with a blank CNTRID covers them all. Only the
+--    WILLISUK line changes; the WILLIS (WE WORLD) line keeps
+--    the print rate. Replace the ??? with how step 0 stores
+--    50 G, and use 'HL' instead of 'WL' if step 0a shows the
+--    lines in OBJECT rather than WL_ROY.
 --------------------------------------------------------------
 -- INSERT INTO OBJECT.RLPDGTRAT
 --        (ROYLIB, STMTID, CNTRID, PAYRAT, PAYRTF, DSPCRT, COMT40)
