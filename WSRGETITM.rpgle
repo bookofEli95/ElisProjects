@@ -15,6 +15,9 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
+       // FIX     10/09/26 EFI Do not allow Please Finish (F9) once every line
+       //                      on the order has been wrapped.  Pressing it by
+       //                      mistake kept the order from invoicing.
        // H7904   07/19/20 SRK Expand the "Pub Code" field.
        // H7904   07/19/20 SRK Expand the "Pub Code" field.
        // H21738  11/04/19 TAK Fix BOM screen for 2 Versions
@@ -283,6 +286,8 @@
      D WrkOrdnum       S              8A
      D WrkDspItm       S                   Like(Scn_DspItm)
      D WrkLineRem      S              6S 0
+     D WrkOpenLines    S              6S 0
+     D WrkOrdWrapped   S              1A
      D WrkFenderUPC    S              1A
      D WrkDisneyUPC    S              1A
      D WrkUPC          S              1A
@@ -873,6 +878,20 @@
           If *In09 = *On;
              If Scn_DspItm  <> 0 or Scn_DspDesc = '       Parts & Scores';
                 Exsr Sbr_Error9;
+             Endif;
+
+             // Do not allow Please Finish when the entire order has been
+             // scanned and wrapped, the order would not invoice.  Checked
+             // after Error 9 since that window can wrap the last item.
+             Exsr Sbr_ChkOrdWrap;
+             If WrkOrdWrapped = 'Y';
+                PrmMssg = 'All items on this order are wrapped. Please '
+                        + 'Finish is not allowed - finish the order instead.';
+                PrmMssgColor = 'RED';
+                PrmMssgAtr1 = 'RI';
+                Callp GURDSPMSG (PrmMssg:PrmMssgColor:PrmMssgAtr1);
+                Exsr Sbr_ClrScreen;
+                Iter;
              Endif;
 
              // Put a '9' in the Exit flag to indicate that this is from Please Finish
@@ -2664,6 +2683,44 @@
                 Leave;
              Endif;
           Enddo;
+       Endsr;
+
+       //***********************************************************************
+       //* Check If The Entire Order Is Wrapped *
+       //****************************************
+       Begsr Sbr_ChkOrdWrap;
+
+          WrkOrdWrapped = 'N';
+
+          // Count the lines still to be wrapped, same test as the Lines
+          // Remaining shown on the screen
+          WrkOpenLines = 0;
+          Setll (Ctl_Ordnum : Ctl_SubAlph) WSLORDDTL4;
+          Dow 1 = 1;
+             Reade (Ctl_Ordnum : Ctl_SubAlph) WSLORDDTL4;
+             If %Eof(WSLORDDTL4);
+                Leave;
+             Endif;
+             If Dt4_Status <> 9;
+                WrkOpenLines = WrkOpenLines + 1;
+             Endif;
+          Enddo;
+
+          // Nothing left to wrap and at least one line was wrapped, so the
+          // order is complete (an order with nothing wrapped is not)
+          If WrkOpenLines = 0;
+             Setgt (Ctl_Ordnum : Ctl_SubAlph) WSLORDDTL1;
+             Dow 1 = 1;
+                Readpe (Ctl_Ordnum : Ctl_SubAlph) WSLORDDTL1;
+                If %Eof(WSLORDDTL1);
+                   Leave;
+                Endif;
+                If Dt1_WrapSeq <> 0 and Dt1_Status = 1;
+                   WrkOrdWrapped = 'Y';
+                   Leave;
+                Endif;
+             Enddo;
+          Endif;
        Endsr;
 
        //***********************************************************************
