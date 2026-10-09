@@ -22,6 +22,12 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
+       // FIX     10/09/26 EFI FLT showed nothing.  Put the orders that make up
+       //                      the SD qty back on the screen.  SOS2324 skipped
+       //                      every line where Qty Ordered = Qty Shipped, and
+       //                      those are the lines that are on the shipping
+       //                      docs.  SD Qty and Wrapped are back to the units
+       //                      on the shipping docs and the units wrapped.
        // SOS2324 09/28/26 PHB Fix SD, Wrapped, Order qty.
        // SRCERR  05/19/22 SRK Fix Source Error
        // H27444  04/16/22 SRK Convert Inventory Inquiry to Portal
@@ -498,15 +504,10 @@
                 Iter;
              Endif;
 
-             // Don't display lines that have been fully shipped
-             If Li2_QtyOrd - Li2_QtyShp = 0;
-                Iter;
-             Endif;
-
              Clear SUBFILE1;
 
              *In44 = (Li2_Status = 'BO');
-             Scn_Sf1EstShp = Li2_QtyOrd - Li2_QtyShp;
+             Scn_Sf1EstShp = Li2_QtyShp;
              Scn_TotalSD += Scn_Sf1EstShp;
              Scn_Sf1LinTyp   = Li2_LinTyp;
              Scn_Sf1OrdNum   = Li2_OrdNum;
@@ -650,10 +651,6 @@
                    Endif;
 
                 Enddo;
-
-                // Keep Wrapped aligned with what's actually left to ship
-                Scn_Sf1Wrapped -= Li2_QtyShp;
-                Scn_TotalWrap -= Li2_QtyShp;
 
                 WrkRrn1 += 1;
                 Write SUBFILE1;
