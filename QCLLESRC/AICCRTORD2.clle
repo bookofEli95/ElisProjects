@@ -29,19 +29,18 @@ DCL        VAR(&BLANK10) TYPE(*CHAR) LEN(10)
 DCL        VAR(&LASTPGM) TYPE(*CHAR) LEN(10)
 DCL        VAR(&NBRCURRCD) TYPE(*DEC) LEN(10)
 
+/* Only one copy may run: hold an exclusive lock for the life of the   */
+/* job. The system releases it when the job ends, normally or not, so  */
+/* a scheduled restart can always take over. CHKOBJ is unmonitored so */
+/* a missing lock object fails loudly instead of exiting silently.     */
+CHKOBJ     OBJ(RELSWPLOCK) OBJTYPE(*DTAARA)
+ALCOBJ     OBJ((RELSWPLOCK *DTAARA *EXCL)) WAIT(60)
+MONMSG     MSGID(CPF1002 CPF1085) EXEC(GOTO CMDLBL(EXIT))
+
 START:
 RTVSYSVAL  SYSVAL(QTIME) RTNVAR(&CURTIME)
 
-/* check if there is more than one job running; if so, end this one */
-WRKJOB     JOB(API_RELSWP) OUTPUT(*PRINT)
-MONMSG     MSGID(CPF1070) EXEC(DO)
-   GOTO       CMDLBL(EXIT)
-ENDDO
-MONMSG     MSGID(CPF1069)
-DLTSPLF    FILE(QPDSPJOB) SPLNBR(*LAST)
-MONMSG     MSGID(CPF3303 CPF3309)
-
-IF         COND(&CURTIME *GE &STRTIME *AND &CURTIME *LE &ENDTIME) THEN(DO)
+IF        COND(&CURTIME *GE &STRTIME *AND &CURTIME *LE &ENDTIME) THEN(DO)
 
 /* Wait until no shipping documents job is running */
 RETRY:
@@ -68,6 +67,8 @@ IF         COND(&COUNT *LT 200) THEN(DO)
    GOTO       CMDLBL(START)
 ENDDO
 
+/* Release the lock first so the resubmitted copy can take it */
+DLCOBJ     OBJ((RELSWPLOCK *DTAARA *EXCL))
 SBMJOB     CMD(CALL PGM(AICCRTORD2)) JOB(API_RELSWP) JOBQ(AS400) +
              USER(QPGMR) RTGDTA(NEVER_END) LOG(4 99 *NOLIST) MSGQ(*NONE)
 
