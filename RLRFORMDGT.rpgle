@@ -15,6 +15,8 @@
        //-----------------------------------------------------------------------
        // Project   Date   Int Description
        // ------- -------- --- -------------------------------------------------
+       // HXXXXX  10/20/26 EFI SLSAMTGBP takes the GBP-converted amount
+       //                      (EXTDOLGBP), not EXTDOL in the sale currency
        // FIX     07/24/25 SAC Digital In School, In Store Sales
        // H31966  05/27/25 TAK Process HLE digital royalties
        //***********************************************************************
@@ -78,7 +80,7 @@
                     WrkPubcode) RLMFORMHL1;
              If %Found(RLMFORMHL1);
                 Hle_InvQty    += Sls_Qty;
-                Hle_SlsAmtGBP += Sls_Extdol;
+                Hle_SlsAmtGBP += Sls_ExtdolGBP;
                 Hle_ExtdolUSD += Sls_ExtdolUSD;
                 Hle_ExtdolGBP += Sls_ExtdolGBP;
                 Update RL$FORMHLE %Fields(Hle_InvQty:
@@ -102,7 +104,7 @@
                 Hle_Desc      = Itm_Sdesc;
                 Hle_Price112  = Sls_Price112;
                 Hle_InvQty    = Sls_Qty;
-                Hle_SlsAmtGBP = Sls_Extdol;
+                Hle_SlsAmtGBP = Sls_ExtdolGBP;
                 Hle_NetPrice  = Sls_NetPrice;
                 Hle_PriceUSD  = Sls_PriceUSD;
                 Hle_PriceGBP  = Sls_PriceGBP;
@@ -145,7 +147,7 @@
                     WrkPubcode) RLMFORMHL1;
              If %Found(RLMFORMHL1);
                 Hle_InvQty    += Sls_Qty;
-                Hle_SlsAmtGBP += Sls_Extdol;
+                Hle_SlsAmtGBP += Sls_ExtdolGBP;
                 Hle_ExtdolUSD += Sls_ExtdolUSD;
                 Hle_ExtdolGBP += Sls_ExtdolGBP;
                 Update RL$FORMHLE %Fields(Hle_InvQty:
@@ -169,7 +171,7 @@
                 Hle_Desc      = Itm_Sdesc;
                 Hle_Price112  = Sls_Price112;
                 Hle_InvQty    = Sls_Qty;
-                Hle_SlsAmtGBP = Sls_Extdol;
+                Hle_SlsAmtGBP = Sls_ExtdolGBP;
                 Hle_NetPrice  = Sls_NetPrice;
                 Hle_PriceUSD  = Sls_PriceUSD;
                 Hle_PriceGBP  = Sls_PriceGBP;
