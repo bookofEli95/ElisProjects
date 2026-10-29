@@ -34,6 +34,45 @@ title repriced in January 2026 is due again in January 2027 and no window covers
 it, so it gets no suggestion (`Skip no rule`) until the window is extended or a
 new one added.
 
+## Completed brackets (29 Oct 2026)
+
+The Manual Price Change Brackets document is complete. `IVPRPCRUL_brackets_update.sql`
+loads what changed, on top of `IVPRPCRUL_seed.sql`:
+
+- **Pop, Classical, Self-Teach**: no change, the seed already matches.
+- **Education**: new six-band grid (`EDU`, model `B`), which settles open item 3
+  for the brackets.
+- **Choral**: under $12.99 a title moves to the set price for its band (octavos
+  $2.75 to $6.50, collections/cantatas/resources $10.95 and $11.95); from $12.99
+  the flat uplifts stand. Choral catalogues move to `RPCMODEL 'B'`. The set
+  prices fix the octavo problem below: Noel $2.50 -> $2.75, Cheap Thrills
+  $2.99 -> $3.25, The Night Will Never Stay stays at $3.50.
+- **Instrumental**: priced from the full product list (the band seed).
+
+Choral and Instrumental can apply automatically: that is phase 2 (`RPCPHASE '2'`),
+already built. It only applies a price by itself for a title with `TPAPRV 'N'`.
+
+Not loaded, waiting on Content:
+
+- **Choral**:
+  - Does the page-count column matter? Matching is by current price only.
+  - No band covers $6.51-$6.94 or $11.96-$12.98.
+  - CDs to $29.99 need a way to tell a CD apart; by price they overlap the
+    $12.99+ uplift bands.
+  - The $11.99 collections cap can't be told apart from other choral books.
+  - $11.95 or $11.99?
+  - Digital tiers.
+- **Education exclusions**: Faber and Digital Agency (separate `DIVCAT`s, or
+  inside Education?), 2025 EE held. Both can be series rows with no rise once the
+  series codes are known.
+- **Legacy EE prices and the EE caps** (Advanced Technique Book 4 at $13.99,
+  Original Series students at $8.99) depend on the book within a series, not
+  just the series. The rule table can't express a price ceiling or a single
+  item, so these need item-level rules (a small addition) or an editor in phase 1.
+- **EE code (book-only) price** must rise by the same percentage as the cover
+  price. The process only reprices `PRICE72`/`PRICE112` today. Where does the
+  code price live, and does it apply to legacy EEi?
+
 Related tickets Paul has asked to fold into this project, all part of removing
 prices from the back of books: SOS-2092 (a field saying whether a product has a
 printed price), SOS-2520 (a field saying whether a price change needs third-party
@@ -195,6 +234,9 @@ The Choral ladder reproduces exactly: `$2.50 -> $2.65`, `$2.99 -> $3.25`,
 `$3.50 -> $3.75`.
 
 ### The bracket model is dangerous for Choral octavos
+
+*Resolved by the completed brackets (29 Oct 2026): Choral now prices under
+$12.99 from set prices, not the flat uplift. Kept for the record.*
 
 The brackets table has one band for everything under $10 and applies `+$3` to it
 in the oldest window. On a per-copy octavo that is not a small rise:
