@@ -1,0 +1,43 @@
+             /****************************************************************/
+             /* P1CBTCHUP                                                    */
+             /* PCR: Batch Upload - CL driver                                */
+             /****************************************************************/
+             /* ************************************************************ */
+             /* Program Information                                          */
+             /* ------------------------------------------------------------ */
+             /* Loads a CSV of new titles into PCRSTAGE, then runs           */
+             /* P1RBTCHUP to create the job/item/catalog records for each    */
+             /* row.                                                         */
+             /* ************************************************************ */
+             /* ************************************************************ */
+             /* Program History                                              */
+             /* ------------------------------------------------------------ */
+             /* Project   Date     Int Description                           */
+             /* ------- -------- --- --------------------------------------- */
+             /* H33975  09/25/26 EFI Parameterize for portal upload screen   */
+             /* ************************************************************ */
+             PGM        PARM(&IFSPATH)
+
+             DCL        VAR(&IFSPATH) TYPE(*CHAR) LEN(256)
+             DCL        VAR(&PATHT)   TYPE(*CHAR) LEN(256)
+
+             /* Build the IFS path */
+             CHGVAR     VAR(&PATHT) VALUE(%TRIM(&IFSPATH))
+
+             /* 1. Wipe the staging table clean */
+             CLRPFM     FILE(OBJECT/PCRSTAGE)
+
+             /* 2. Upload the CSV into the staging table */
+             CPYFRMIMPF FROMSTMF(&PATHT) TOFILE(OBJECT/PCRSTAGE) +
+                          MBROPT(*REPLACE) FROMCCSID(1208) TOCCSID(*FILE) +
+                          RCDDLM(*CRLF) DTAFMT(*DLM) STRDLM('"') +
+                          FLDDLM(',') FROMRCD(4) ERRLVL(*NOMAX) +
+                          RPLNULLVAL(*FLDDFT) RMVBLANK(*BOTH)
+
+             /* 3. Call the RPGLE batch processing program */
+             CALL       PGM(OBJECT/P1RBTCHUP)
+
+             /* 4. Clean up staging table */
+             CLRPFM     FILE(OBJECT/PCRSTAGE)
+
+             ENDPGM
