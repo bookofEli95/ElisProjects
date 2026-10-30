@@ -15,9 +15,12 @@
       // ------------------------------------------------------------------
       // Project   Date     Int Description
       // ------- -------- --- ---------------------------------------------
+       // H33975  09/25/26 EFI PCR Automationeadsheet
       // EFIFIX  08/18/26 EFI Create initial upload RPGLE program
       // EFIFIX  09/15/26 EFI Fix STG_ prefix trim and ROY_ field-name
       //                      collision; calculations in /free block
+      // H33975  10/30/26 EFI PCRSTAGE.STGAUTHOR widened to 80 so full
+      //                      author names reach Sbr_Match_Author
       // ******************************************************************
 
       //Input Files
@@ -137,12 +140,12 @@
      D WrkAuthSurname  S             40A    Inz(*Blanks)
      D WrkAuthFirst    S             40A    Inz(*Blanks)
      D WrkAuthCand     S             12A    Inz(*Blanks)
-     D WrkAuthPos      S              5S 0 Inz(0)
-     D WrkAuthScanFrom S              5S 0 Inz(0)
-     D WrkAuthWordsOrg S             40A    Dim(10) Inz(*Blanks)
-     D WrkAuthWordCnt  S              5S 0 Inz(0)
-     D WrkAuthSurnStart S             5S 0 Inz(0)
-     D WrkAuthIdx      S              5S 0 Inz(0)
+     D WrkAuthPos      S              5S 0  Inz(0)
+     D WrkAuthScnF     S              5S 0  Inz(0)
+     D WrkAuthWrdOrg   S             40A    Dim(10) Inz(*Blanks)
+     D WrkAuthWordCnt  S              5S 0  Inz(0)
+     D WrkAuthSurStr   S              5S 0  Inz(0)
+     D WrkAuthIdx      S              5S 0  Inz(0)
      D WrkAuthInit     S             20A    Inz(*Blanks)
      D WrkAuthWord     S             40A    Inz(*Blanks)
      D WrkAuthAddVal   S             12A    Inz(*Blanks)
@@ -770,55 +773,62 @@
                WrkAuthFirst   = %Trim(%Subst(WrkAuthNorm : WrkAuthPos + 1));
             Else;
                WrkAuthWordCnt = 0;
-               WrkAuthScanFrom = 1;
-               Dow WrkAuthScanFrom <= %Len(WrkAuthOrig) And WrkAuthWordCnt < 10;
-                  WrkAuthPos = %Scan(' ' : WrkAuthOrig : WrkAuthScanFrom);
+               WrkAuthScnF = 1;
+               Dow WrkAuthScnF <= %Len(WrkAuthOrig) And WrkAuthWordCnt < 10;
+                  WrkAuthPos = %Scan(' ' : WrkAuthOrig : WrkAuthScnF);
                   If WrkAuthPos = 0;
                      WrkAuthWordCnt += 1;
-                     WrkAuthWordsOrg(WrkAuthWordCnt) = %Subst(WrkAuthOrig : WrkAuthScanFrom);
+                     WrkAuthWrdOrg(WrkAuthWordCnt)
+                     = %Subst(WrkAuthOrig : WrkAuthScnF);
                      Leave;
                   Else;
-                     If WrkAuthPos > WrkAuthScanFrom;
+                     If WrkAuthPos > WrkAuthScnF;
                         WrkAuthWordCnt += 1;
-                        WrkAuthWordsOrg(WrkAuthWordCnt) =
-                           %Subst(WrkAuthOrig : WrkAuthScanFrom : WrkAuthPos - WrkAuthScanFrom);
+                        WrkAuthWrdOrg(WrkAuthWordCnt) =
+                           %Subst(WrkAuthOrig : WrkAuthScnF :
+                            WrkAuthPos - WrkAuthScnF);
                      Endif;
-                     WrkAuthScanFrom = WrkAuthPos + 1;
+                     WrkAuthScnF = WrkAuthPos + 1;
                   Endif;
                Enddo;
 
                If WrkAuthWordCnt <= 1;
-                  WrkAuthSurname = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(1)));
+                  WrkAuthSurname =
+                  %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWrdOrg(1)));
                   WrkAuthFirst   = *Blanks;
                Else;
-                  WrkAuthSurnStart = WrkAuthWordCnt;
-                  Dow WrkAuthSurnStart > 1;
-                     WrkAuthWord = %TrimR(WrkAuthWordsOrg(WrkAuthSurnStart - 1));
+                  WrkAuthSurStr = WrkAuthWordCnt;
+                  Dow WrkAuthSurStr > 1;
+                     WrkAuthWord = %TrimR(WrkAuthWrdOrg(WrkAuthSurStr - 1));
                      If WrkAuthWord <> *Blanks And
                         %Xlate(WrkUp:WrkLow:WrkAuthWord) = WrkAuthWord;
-                        WrkAuthSurnStart -= 1;
+                        WrkAuthSurStr -= 1;
                      Else;
                         Leave;
                      Endif;
                   Enddo;
 
                   WrkAuthSurname = *Blanks;
-                  For WrkAuthIdx = WrkAuthSurnStart To WrkAuthWordCnt;
+                  For WrkAuthIdx = WrkAuthSurStr To WrkAuthWordCnt;
                      If WrkAuthSurname = *Blanks;
-                        WrkAuthSurname = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                        WrkAuthSurname =
+                        %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWrdOrg(WrkAuthIdx)));
                      Else;
                         WrkAuthSurname = %TrimR(WrkAuthSurname) + ' ' +
-                                         %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                                         %Xlate(WrkLow:WrkUp:
+                                         %TrimR(WrkAuthWrdOrg(WrkAuthIdx)));
                      Endif;
                   Endfor;
 
                   WrkAuthFirst = *Blanks;
-                  For WrkAuthIdx = 1 To WrkAuthSurnStart - 1;
+                  For WrkAuthIdx = 1 To WrkAuthSurStr - 1;
                      If WrkAuthFirst = *Blanks;
-                        WrkAuthFirst = %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                        WrkAuthFirst = %Xlate(WrkLow:WrkUp:
+                        %TrimR(WrkAuthWrdOrg(WrkAuthIdx)));
                      Else;
                         WrkAuthFirst = %TrimR(WrkAuthFirst) + ' ' +
-                                       %Xlate(WrkLow:WrkUp:%TrimR(WrkAuthWordsOrg(WrkAuthIdx)));
+                                       %Xlate(WrkLow:WrkUp:
+                                       %TrimR(WrkAuthWrdOrg(WrkAuthIdx)));
                      Endif;
                   Endfor;
                Endif;
@@ -829,7 +839,8 @@
             // this as the value to add to MFAUTHOR if every candidate
             // below comes up empty.
             If WrkAuthFirst <> *Blanks;
-               WrkAuthCand = %TrimR(WrkAuthSurname) + ' ' + %TrimR(WrkAuthFirst);
+               WrkAuthCand =
+               %TrimR(WrkAuthSurname) + ' ' + %TrimR(WrkAuthFirst);
             Else;
                WrkAuthCand = %TrimR(WrkAuthSurname);
             Endif;
@@ -845,16 +856,16 @@
                // middle name word (e.g. "Thomas Agerfeldt" -> "T A",
                // "Gabriel" -> "G").
                WrkAuthInit = *Blanks;
-               WrkAuthScanFrom = 1;
-               Dow WrkAuthScanFrom <= %Len(%TrimR(WrkAuthFirst));
-                  WrkAuthPos = %Scan(' ' : WrkAuthFirst : WrkAuthScanFrom);
+               WrkAuthScnF = 1;
+               Dow WrkAuthScnF <= %Len(%TrimR(WrkAuthFirst));
+                  WrkAuthPos = %Scan(' ' : WrkAuthFirst : WrkAuthScnF);
                   If WrkAuthPos = 0;
-                     WrkAuthWord = %Trim(%Subst(WrkAuthFirst : WrkAuthScanFrom));
-                     WrkAuthScanFrom = %Len(%TrimR(WrkAuthFirst)) + 1;
+                     WrkAuthWord = %Trim(%Subst(WrkAuthFirst : WrkAuthScnF));
+                     WrkAuthScnF = %Len(%TrimR(WrkAuthFirst)) + 1;
                   Else;
-                     WrkAuthWord = %Trim(%Subst(WrkAuthFirst : WrkAuthScanFrom :
-                                          WrkAuthPos - WrkAuthScanFrom));
-                     WrkAuthScanFrom = WrkAuthPos + 1;
+                     WrkAuthWord = %Trim(%Subst(WrkAuthFirst : WrkAuthScnF :
+                                          WrkAuthPos - WrkAuthScnF));
+                     WrkAuthScnF = WrkAuthPos + 1;
                   Endif;
                   If WrkAuthWord <> *Blanks;
                      If WrkAuthInit = *Blanks;
@@ -867,7 +878,8 @@
                Enddo;
 
                If WrkAuthInit <> *Blanks;
-                  WrkAuthCand = %TrimR(WrkAuthSurname) + ' ' + %TrimR(WrkAuthInit);
+                  WrkAuthCand =
+                  %TrimR(WrkAuthSurname) + ' ' + %TrimR(WrkAuthInit);
                   Chain WrkAuthCand MFAUTHOR;
                   If %Found(MFAUTHOR);
                      WrkAuthor = WrkAuthCand;
@@ -895,3 +907,5 @@
 
          Endsr;
       /end-free
+
+
