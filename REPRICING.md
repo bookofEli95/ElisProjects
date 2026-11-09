@@ -78,6 +78,22 @@ prices from the back of books: SOS-2092 (a field saying whether a product has a
 printed price), SOS-2520 (a field saying whether a price change needs third-party
 approval) and BS-1572 (changes to ISBN and QR code generation).
 
+## One screen for re-run quantity and price (9 Nov 2026)
+
+Marketing asked for the price decision to be made on the existing re-run
+approval screens, not a separate one, so the re-run quantity and the price are
+decided together with the sales, price and stock figures in one place. Those
+screens already had a New Price field (`IVPORRITM.NEWPRICE`), the code price,
+the last price change date and 12-month / last-year / 2-year sales.
+
+`RRN_PRICING.md` puts the suggestion there: the price shows pink on the list
+when a change is waiting, and the change screen shows the suggested price and
+why, fills New Price with it, and records the decision on the suggestion (`A`,
+`O` or `R`). `IVRRPCAPL` carries on unchanged from there. `IVRRPCWRK` is no
+longer needed for marketing.
+
+Still open: margin (which cost?) and a long-term price history pop-up.
+
 ## Printed price and third-party approval (SOS-2092, SOS-2520)
 
 Both flags live in one new file, **`IVPPRTPRT`**, keyed by item — the file Kyle
@@ -138,7 +154,7 @@ Still to build, once decided:
 | `IVPPRTPRT` | PF | Printed price and third-party approval per item (SOS-2092, SOS-2520) |
 | `IVVRPCWRK` | DSPF | Work with Repricing Suggestions |
 | `IVRRPCGEN` | RPGLE | Generates suggestions |
-| `IVRRPCWRK` | RPGLE | Editor approves, overrides or rejects |
+| `IVRRPCWRK` | RPGLE | Editor approves, overrides or rejects (being replaced by the RRN screens - see `RRN_PRICING.md`) |
 | `IVRRPCAPL` | RPGLE | Attaches, prices and releases CNOs; stages decisions; expires stale suggestions |
 | `IVCRPCMTH` | CL | Monthly run |
 | `IVCRPCBLD` | CL | Creates the objects |

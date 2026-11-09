@@ -12,7 +12,7 @@ ones in those listings. Make them in the H33979 copies first.
 |---|---|
 | `IVSORRMKT` (DSPF) | two 1-character columns at the right of the summary list; two fields on the detail view |
 | `IVRORRMKT` (RPG) | read `IVPPRTPRT` for each line loaded |
-| `IVSORRMKTC` (DSPF) | two entry fields on line 12 |
+| `IVSORRMKTC` (DSPF) | two entry fields on line 15 |
 | `IVRORRMKTC` (RPG) | load, confirm and save the flags; one `IVPMAINT` row per flag changed |
 
 Values: printed price `Y` / `N` / `S` (stickered) / blank (not known);
@@ -146,18 +146,19 @@ and again at seq 130100:
       * H33979  10/06/26 EFI Add printed price and 3rd party approval flags
 ```
 
-**Record `SCREEN1`** - anywhere among the fields (for example after the
-`QUOTEWHO` field on row 12). Row 12 is free from column 46; both fields are
-protected in the Milwaukee view (indicator 51) like the other entry fields:
+**Record `SCREEN1`** - after the `WPCOMT` field on row 15 (seq 20900). Row 15
+is free from column 53 (row 12 is now the suggested price - see
+`RRN_PRICING.md`). Both fields are protected in the Milwaukee view
+(indicator 51) like the other entry fields:
 
 ```
-     A                                 12 46'Printed Price:'
-     A            PRTPRC         1A  B 12 61VALUES(' ' 'Y' 'N' 'S')
+     A                                 15 53'Prt Price:'
+     A            PRTPRC         1A  B 15 64VALUES(' ' 'Y' 'N' 'S')
      A                                      DSPATR(HI)
      A N51                                  DSPATR(UL)
      A  51                                  DSPATR(PR)
-     A                                 12 64'3rd Pty Apv:'
-     A            TPAPRV         1A  B 12 77VALUES(' ' 'Y' 'N')
+     A                                 15 66'3rd Pty:'
+     A            TPAPRV         1A  B 15 75VALUES(' ' 'Y' 'N')
      A                                      DSPATR(HI)
      A N51                                  DSPATR(UL)
      A  51                                  DSPATR(PR)
