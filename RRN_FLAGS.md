@@ -1,5 +1,10 @@
 # RRN screens: printed price and third-party approval (SOS-2092, SOS-2520)
 
+**The full members, with these edits and the ones in `RRN_PRICING.md` already applied, are in the
+repo: `IVSORRMKT.dds`, `IVRORRMKT.rpgle`, `IVSORRMKTC.dds`, `IVRORRMKTC.rpgle`.**
+They were rebuilt from the SEU listings of 11/09/26. Copy them over the H33979 members
+instead of making the edits by hand.
+
 Edits to the four existing online re-run (RRN) members so the two `IVPPRTPRT`
 flags can be seen on the marketing list and changed on the change screen,
 with every change written to `IVPMAINT` like any other item field.

@@ -1,0 +1,539 @@
+     A*%%TS  SD  20190724  115100  CARMEN      REL-V7R1M0  5770-WDS
+     A**************************************************************************
+     A* IVSORRMKT
+     A* Online Rerun System: Marketing
+     A**************************************************************************
+     A*
+     A**************************************************************************
+     A* File Information
+     A*-------------------------------------------------------------------------
+     A*
+     A**************************************************************************
+     A*
+     A**************************************************************************
+     A* File History
+     A*-------------------------------------------------------------------------
+     A* Project   Date   Int Description
+     A* ------- -------- --- ---------------------------------------------------
+      * H33979  11/10/26 EFI Show printed price, 3rd party approval and the
+      *                      suggested price (SOS-2092, SOS-2520)
+      * SOS2366 08/25/26 PHB CNS QTY PEPPER TO CNSQTY TOTAL
+      * H27742  10/27/21 KMS Auto populate the New Price field in the rerun pr
+      *                      ogram for items needing price increases - Flip th
+      *                      e color of the price if it is using the new price
+      *                       field in IVPORRITM
+      * H27251  08/11/21 KMS Changes to Rerun program
+      * MISC    03/18/21 SRK Source Error
+      * H25474  08/10/20 CMN Add date of last price increase to approvers' rer
+      *                      un screens
+      * H23057  08/21/19 CJR Under online rerun system - Marketing, can a colu
+      *                      mn be added for a "kit"?
+     A* FIX     07/24/19 CMN Watch for too big negative numbers
+     A* H11555  08/27/15 RAT Add BO quantity to the rerun Marketing screen.
+     A* 10275  06/30/15 NAH  erun: add to the screen either an indicator or th
+     A*                      e consignment quanty from Pepper's two consignmen
+     A*                      t locations.
+     A* 9104   12/03/14 SRK  ource Cleanup - Remove PUTOVR,OVRDTA,OVRATR
+     A* ISC3   10/29/14 SRK  ource Cleanup
+     A* 1528   05/30/12 JFH  hange print file created using F21 to email a PDF
+     A*                      to the user.
+     A* 22027  11/15/09 CMN  CS] Increase size of price field
+     A* 23025  03/21/09 CMN  DP] fix ORR - field size too small
+     A* 22869  03/19/09 DRS  IV] Online Rerun: DeHaske reprints
+     A* 15231  09/09/07 TRO  RO] Add new owner/publisher fields
+     A* 1661   04/05/06 TRO  O930-Change Online Rerun for Amadeus/Limelght
+     A* C00330 11/23/05 CMN  ew Yamaha item cross reference file
+     A* B00003 02/15/05 KCS  nventory/Online Rerun changes for Betty
+     A* A00644 09/27/04 KCS  nline Rerun System: Marketing approvals
+     A**************************************************************************
+     A*%%EC
+     A                                      DSPSIZ(27 132 *DS4)
+     A                                      REF(FIELD_REF)
+     A                                      VLDCMDKEY(26 'Valid Cmd keys')
+     A                                      CF01(01)
+     A                                      CF02(02)
+     A                                      CA03(03 'Exit')
+     A                                      CF04(04 'View')
+     A                                      CF05(05)
+     A                                      CF06(06 'Pos to')
+     A                                      CF07(07)
+     A                                      CF08(08)
+     A  84                                  CF09(09 'Toggle')
+     A                                      CF10(10)
+     A                                      CF11(11)
+     A                                      CA12(12 'Cancel')
+     A                                      CF13(13)
+     A                                      CF14(14)
+     A                                      CF15(15)
+     A                                      CF16(16)
+     A                                      CF17(17)
+     A                                      CF18(18)
+     A                                      CF19(19)
+     A                                      CF20(20)
+     A                                      CF21(21 'Email')
+     A                                      CF22(22)
+     A                                      CF23(23)
+     A                                      CF24(24)
+     A                                      HELP(25 'Instructions')
+     A                                      WDWBORDER((*COLOR WHT))
+     A                                      CSRINPONLY
+      **************************************************************************
+      **************************************************************************
+      *
+      *
+      **************************************************************************
+      **   IF CHANGE ARE MADE TO THIS PROGRAM YOU MIGHT ALSO NEED TO CHANGE   **
+      **                              IVDORRMKT                               **
+      **************************************************************************
+      *
+      *
+     A          R SFL1                      SFL
+     A  35                                  SFLNXTCHG
+     A            OPTION    R        B  8  2
+     A N50                                  DSPATR(HI)
+     A            EXPCD     R        B  8  4
+     A N50                                  DSPATR(HI)
+     A            RERUNSTS  R        O  8  8
+     A N50                                  DSPATR(HI)
+     A            CNTRTP    R        O  8 10
+     A N50                                  DSPATR(HI)
+     A            ITMNUM    R        O  8 12
+     A N50                                  DSPATR(HI)
+     A  60                                  COLOR(YLW)
+     A  62                                  COLOR(TRQ)
+     A            SDESC         23A  O  8 21
+     A N50                                  DSPATR(HI)
+     A  60                                  COLOR(YLW)
+     A  62                                  COLOR(TRQ)
+     A            QTYAVAIL  R    5   O  8 45EDTCDE(M)
+     A N50                                  DSPATR(HI)
+     A            STARTDT         L  O  8 52TEXT('Start Date')
+     A                                      DATFMT(*USA)
+     A                                      MAPVAL(('01/01/0001' *BLANK))
+     A N50                                  DSPATR(HI)
+     A  53                                  COLOR(RED)
+     A  53                                  DSPATR(RI)
+     A            PRICE72        7Y 2O  8 63EDTCDE(4)
+     A N50                                  DSPATR(HI)
+     A  52                                  DSPATR(RI)
+     A  64                                  COLOR(PNK)
+     A            ESTRRQTY       7A  O  8 72
+     A N50                                  DSPATR(HI)
+     A            PERMOT         2A  O  8 80
+     A N50                                  DSPATR(HI)
+     A            BOQTY          5  0   8 83EDTCDE(Z)
+     A N50                                  DSPATR(HI)
+     A            CNO            1A  O  8 89
+     A N50                                  DSPATR(HI)
+     A            CNSQTY         6  0   8 91EDTCDE(O)
+     A                                      DSPATR(HI)
+     A  54                                  DSPATR(RI)
+     A            SF1KIT         3A  O  8100
+     A N56                                  DSPATR(HI)
+     A            MINQTYDT  R        H
+     A            IMPORTED       1A  H
+     A            ROYAPRV        1A  H
+     A            PRTQUOTE       1A  H
+     A            PRICECHGD       L     8105TEXT('Start Date')
+     A                                      DATFMT(*USA)
+     A                                      MAPVAL(('01/01/0001' *BLANK))
+     A  58                                  COLOR(YLW)
+     A N58                                  DSPATR(HI)
+     A            BINDNG         3      8121
+     A N50                                  DSPATR(HI)
+     A            PAGES          4  0   8116EDTCDE(Z)
+     A N50                                  DSPATR(HI)
+     A            PRTPRC         1A  O  8126
+     A N50                                  DSPATR(HI)
+     A            TPAPRV         1A  O  8130
+     A N50                                  DSPATR(HI)
+      **************************************************************************
+      **************************************************************************
+      **************************************************************************
+     A          R SFLCTL1                   SFLCTL(SFL1)
+     A                                      SFLSIZ(9999)
+     A                                      SFLPAG(0017)
+     A                                      OVERLAY
+     A  31                                  SFLDSP
+     A  32                                  SFLDSPCTL
+     A  33                                  SFLCLR
+     A  77                                  SFLEND(*MORE)
+     A                                      SFLCSRRRN(&RRN)
+     A            RRN            5S 0H
+     A            POS2RRN        4S 0H      SFLRCDNBR(CURSOR)
+     A            TTLDATE   R        O  1  2TEXT('Screen Title Date')
+     A                                      DSPATR(HI)
+     A                                      COLOR(BLU)
+     A                                      DATFMT(*USA)
+     A            TTLTEXT132   109   O  1 13DSPATR(HI)
+     A                                      COLOR(BLU)
+     A                                      DSPATR(RI)
+     A            TTLPGM        10   O  1123
+     A                                      DSPATR(HI)
+     A                                      COLOR(BLU)
+     A            TTLLINE2     131   O  2  2DSPATR(HI)
+     A                                      DSPATR(UL)
+     A                                      COLOR(BLU)
+     A                                  6 12'Pos To:'
+     A            STARTFLD  R        B  6 20REFFLD(ITMNUM)
+     A                                      CHECK(FE)
+     A                                      CHECK(RZ)
+     A                                      CHECK(ER)
+     A                                      DSPATR(HI)
+     A                                      DSPATR(UL)
+     A  61                                  DSPATR(PC)
+     A                                  7  2'A'
+     A                                      DSPATR(RI)
+     A                                  7  4'Exp'
+     A                                      DSPATR(RI)
+     A                                  7 12'   Item#'
+     A                                      DSPATR(RI)
+     A                                  7 52'Start Date'
+     A                                      DSPATR(RI)
+     A                                  3  2'Options: A=Accept, C=Change, E=Ema-
+     A                                      il, N=Not to be rerun, Q=Quote'
+     A                                      COLOR(PNK)
+     A                                  6 72'  Est  '
+     A                                      DSPATR(RI)
+     A                                  7 72'RRN Qty'
+     A                                      DSPATR(RI)
+     A                                  3 67'R=Remove, H=Hold, U=Undo/reset,'
+     A                                      COLOR(PNK)
+     A                                  7 63' Price  '
+     A                                      DSPATR(RI)
+     A                                  6 63'Current '
+     A                                      DSPATR(RI)
+     A                                  4 63'Pink price = price suggested'
+     A                                      COLOR(PNK)
+     A                                  7 45'Avail'
+     A                                      DSPATR(RI)
+     A                                  6 45' Qty '
+     A                                      DSPATR(RI)
+     A                                  7 21'Description            '
+     A                                      DSPATR(RI)
+     A                                  7 80'BO'
+     A                                      DSPATR(RI)
+     A                                  5 12'Number of items waiting for approv-
+     A                                      al:'
+     A            NBRWAIT        6Y 0O  5 50DSPATR(HI)
+     A                                      EDTCDE(1)
+     A                                  5 89'C'
+     A                                      DSPATR(RI)
+     A                                  6 89'N'
+     A                                      DSPATR(RI)
+     A                                  7 89'O'
+     A                                      DSPATR(RI)
+     A                                  5 58'for'
+     A            MKTCOORD      10A  O  5 62DSPATR(HI)
+     A                                  5  8'S'
+     A                                      DSPATR(RI)
+     A                                  6  8'T'
+     A                                      DSPATR(RI)
+     A                                  7  8'S'
+     A                                      DSPATR(RI)
+     A                                  5 10'A'
+     A                                      DSPATR(RI)
+     A                                  6 10'G'
+     A                                      DSPATR(RI)
+     A                                  7 10'Y'
+     A                                      DSPATR(RI)
+     A                                  3 99'O=DeHaske Order'
+     A                                      COLOR(PNK)
+     A N55                                  DSPATR(ND)
+     A                                  7 92'Qty'
+     A                                      COLOR(GRN)
+     A                                      DSPATR(RI)
+     A                                  6 92'Con'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  7 83'BOQty'
+     A                                      DSPATR(RI)
+     A                                  7100'Kit'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  5104'(Date Added)'
+     A                                      COLOR(YLW)
+     A                                  6105'Last Price'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  7105'  Change  '
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  7121'Binding'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  5125'Prt'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  6125'Prc'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  5129'3rd'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  6129'Pty'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+     A                                  7116'Page'
+     A                                      DSPATR(RI)
+     A                                      COLOR(GRN)
+      **************************************************************************
+     A          R MESSAGE                   TEXT('MESSAGE')
+     A                                      OVERLAY
+     A                                 26  2'F3=Exit'
+     A                                      COLOR(BLU)
+     A                                 26 11'F4=View Detail'
+     A                                      COLOR(BLU)
+     A  84                             26 38'F9=Toggle'
+     A                                      COLOR(BLU)
+     A                                 26 49'F21=Email List'
+     A                                      COLOR(BLU)
+     A            MSG       R        O 27  2REFFLD($MSG)
+     A                                      DSPATR(HI)
+     A                                 26 27'F6=Pos To'
+     A                                      COLOR(BLU)
+     A**************************************************************************
+     A**************************************************************************
+     A**************************************************************************
+     A          R SFL2                      SFL
+     A*%%TS  SD  20190724  115100  CARMEN      REL-V7R1M0  5770-WDS
+     A  35                                  SFLNXTCHG
+     A                                  6  1'A'
+     A                                  6  3'Exp'
+     A                                  6  7'St'
+     A                                  6 11'Item'
+     A                                  6 18'Description               '
+     A                                  6 45'QtyAvail'
+     A                                  6 54'StrtDt'
+     A                                  6 61'BODate'
+     A                                  6 68'BLWMin'
+     A                                  6 75'BOQty'
+     A            OPTION2   R        B  7  1REFFLD(OPTION)
+     A N50                                  DSPATR(HI)
+     A            EXPCD2    R        B  7  3REFFLD(EXPCD)
+     A N50                                  DSPATR(HI)
+     A            RERUNSTS2 R        O  7  7REFFLD(RERUNSTS)
+     A N50                                  DSPATR(HI)
+     A            ITMNUM2   R        O  7  9REFFLD(ITMNUM)
+     A N50                                  DSPATR(HI)
+     A  62                                  COLOR(TRQ)
+     A            SDESC2        26A  O  7 18
+     A N50                                  DSPATR(HI)
+     A  62                                  COLOR(TRQ)
+     A            QTYAVAIL2 R        O  7 45REFFLD(QTYAVAIL)
+     A                                      EDTCDE(M)
+     A N50                                  DSPATR(HI)
+     A            STARTDT2       6A  O  7 54
+     A N50                                  DSPATR(HI)
+     A  53                                  COLOR(RED)
+     A  53                                  DSPATR(RI)
+     A            ESTBODT2       6A  O  7 61
+     A N50                                  DSPATR(HI)
+     A            MINQTYDT2      6A  O  7 68
+     A N50                                  DSPATR(HI)
+     A            BOQTY2         5Y 0O  7 75EDTCDE(Z)
+     A N50                                  DSPATR(HI)
+     A                                  8  2'BO'
+     A                                  8  6'EstRRQ'
+     A                                  8 14'AppRRQ'
+     A                                  8 21'NewPri'
+     A                                  8 30'CurPri'
+     A                                  8 39'DP'
+     A                                  8 42'12MSls'
+     A                                  8 50'LYSls'
+     A                                  8 56'2YrSls'
+     A                                  8 64'Quote'
+     A                                  8 74'LRQty'
+     A            PERMOT2        2A  O  9  2
+     A N50                                  DSPATR(HI)
+     A            ESTRRQTY2      7A  O  9  5
+     A N50                                  DSPATR(HI)
+     A            APPRRQTY2 R        O  9 13REFFLD(APPRRQTY)
+     A                                      EDTCDE(Z)
+     A N50                                  DSPATR(HI)
+     A            NEWPRICE2 R        O  9 21REFFLD(PRICE72)
+     A N50                                  DSPATR(HI)
+     A                                      EDTCDE(4)
+     A            PRICE2    R        O  9 30REFFLD(PRICE72)
+     A N50                                  DSPATR(HI)
+     A                                      EDTCDE(4)
+     A            MSWPCD2   R        O  9 40REFFLD(MSWPCD)
+     A N50                                  DSPATR(HI)
+     A            MSLS2          6Y 0O  9 42EDTCDE(Z)
+     A N50                                  DSPATR(HI)
+     A            LYSLS2         6Y 0O  9 49EDTCDE(Z)
+     A N50                                  DSPATR(HI)
+     A            PYSLS2         6Y 0O  9 56EDTCDE(Z)
+     A N50                                  DSPATR(HI)
+     A            QUOTEPRC2 R        O  9 63REFFLD(PRICE72)
+     A N50                                  DSPATR(HI)
+     A                                      EDTCDE(4)
+     A            LRQTY2         7Y 0O  9 73EDTCDE(Z)
+     A N50                                  DSPATR(HI)
+     A                                  8 81'SugPri'
+     A                                  8 90'Why'
+     A            SUGPRICE2      7Y 2O  9 81EDTCDE(4)
+     A N50                                  DSPATR(HI)
+     A                                      COLOR(PNK)
+     A            SUGNOTE2      40A  O  9 90
+     A                                      COLOR(PNK)
+     A                                 10  2'WIP Cmt:'
+     A            WPCOMT    R        O 10 11REFFLD(COMT30)
+     A                                      DSPATR(HI)
+     A                                 10 42'CNO'
+     A            CNO2           1A  O 10 46
+     A N50                                  DSPATR(HI)
+     A                                 10 48'AGY'
+     A            CNTRTP2        1A  O 10 52
+     A N50                                  DSPATR(HI)
+     A                                 10 54'LRDate'
+     A            LRDATE2        5A  O 10 61
+     A N50                                  DSPATR(HI)
+     A                                 10 67'FRunDt'
+     A            FRUNDT2        5A  O 10 74
+     A N50                                  DSPATR(HI)
+     A                                 10 80'PrtPrc'
+     A            PRTPRC2        1A  O 10 87
+     A N50                                  DSPATR(HI)
+     A                                 10 89'3rdPty'
+     A            TPAPRV2        1A  O 10 96
+     A N50                                  DSPATR(HI)
+     A                                 11  1'__________________________________-
+     A                                      ___________________________________-
+     A                                      __________'
+     A            MINQTYDT  R        H
+     A            IMPORTED       1A  H
+     A            ROYAPRV        1A  H
+     A            PRTQUOTE       1A  H
+      **************************************************************************
+     A          R SFLCTL2                   SFLCTL(SFL2)
+     A                                      SFLSIZ(0003)
+     A                                      SFLPAG(0002)
+     A                                      OVERLAY
+     A                                      SFLCSRRRN(&RRN)
+     A  31                                  SFLDSP
+     A  32                                  SFLDSPCTL
+     A  33                                  SFLCLR
+     A  77                                  SFLEND(*MORE)
+     A            RRN            5S 0H
+     A            POS2RRN        4S 0H      SFLRCDNBR(CURSOR)
+     A            TTLDATE   R        O  1  2TEXT('Screen Title Date')
+     A                                      DSPATR(HI)
+     A                                      COLOR(BLU)
+     A                                      DATFMT(*USA)
+     A            TTLTEXT   R  109   O  1 13DSPATR(HI)
+     A                                      COLOR(BLU)
+     A                                      DSPATR(RI)
+     A            TTLPGM    R        O  1123REFFLD($PGM)
+     A                                      DSPATR(HI)
+     A                                      COLOR(BLU)
+     A            TTLLINE2  R  131   O  2  2DSPATR(HI)
+     A                                      DSPATR(UL)
+     A                                      COLOR(BLU)
+     A                                  3  2'Options: A=Acpt,C=Chg,N=NBR,E=Emai-
+     A                                      l,Q=Quote,O=Ordered,R=Rmv,H=Hold,U=-
+     A                                      Undo'
+     A                                      COLOR(PNK)
+     A                                  4  2'Number of items waiting for approv-
+     A                                      al:'
+     A            NBRWAIT        6Y 0O  4 40DSPATR(HI)
+     A                                      EDTCDE(2)
+     A                                  4 48'for'
+     A            MKTCOORD      10A  O  4 52DSPATR(HI)
+      **************************************************************************
+     A          R MESSAGE2                  TEXT('MESSAGE')
+     A                                      OVERLAY
+     A                                 23  2'F3=Exit'
+     A                                      COLOR(BLU)
+     A                                 23 12'F4=View Summary'
+     A                                      COLOR(BLU)
+     A  84                             23 30'F9=Toggle'
+     A                                      COLOR(BLU)
+     A                                 23 42'F21=Print List'
+     A                                      COLOR(BLU)
+     A            MSG       R        O 24  2REFFLD($MSG)
+     A                                      DSPATR(HI)
+      **************************************************************************
+     A          R DLTWDW
+     A                                      WINDOW(*DFT 13 45)
+     A                                      OVERLAY
+     A                                  1  1'              Remove Item# Record -
+     A                                                 '
+     A                                      COLOR(BLU)
+     A                                      DSPATR(UL)
+     A                                  3  6'Item#:'
+     A            WDWITMNUM R        O  3 13REFFLD(ITMNUM)
+     A                                      DSPATR(HI)
+     A                                  4  7'Desc:'
+     A            WDWSDESC      25A  O  4 13DSPATR(HI)
+     A                                  5  5'Status:'
+     A            WDWSTATUS      1A  O  5 13DSPATR(HI)
+     A                                  6  2'Qty Avail:'
+     A            WDWQTYAVL R        O  6 13REFFLD(QTYAVAIL)
+     A                                      DSPATR(HI)
+     A                                  7  1'Start Date:'
+     A            WDWSTARTDT      L  O  7 13DATFMT(*MDY)
+     A                                      MAPVAL(('01/01/40' *BLANK))
+     A                                      DSPATR(HI)
+     A                                  8  2'Cur Price:'
+     A            WDWPRICE  R        O  8 13REFFLD(PRICE72)
+     A                                      DSPATR(HI)
+     A                                  9  1'Est RR Qty:'
+     A            WDWESTRRQTR        O  9 13REFFLD(ESTRRQTY)
+     A                                      DSPATR(HI)
+     A                                      EDTCDE(4)
+     A                                 11  1'F12=Cancel'
+     A                                      COLOR(BLU)
+     A            WDWMSG        45A  O 12  1DSPATR(HI)
+      **************************************************************************
+     A          R RRNWDW
+     A                                      WINDOW(*DFT 13 45)
+     A                                      OVERLAY
+     A                                  1  1'              Flag Item as Rerun  -
+     A                                                 '
+     A                                      COLOR(BLU)
+     A                                      DSPATR(UL)
+     A                                  3  6'Item#:'
+     A            WDWITMNUM R        O  3 13REFFLD(ITMNUM)
+     A                                      DSPATR(HI)
+     A                                  4  7'Desc:'
+     A            WDWSDESC      25A  O  4 13DSPATR(HI)
+     A                                  5  2'Rerun Qty:'
+     A            WDWESTRRQTR        O  5 13REFFLD(ESTRRQTY)
+     A                                      DSPATR(HI)
+     A                                      EDTCDE(4)
+     A                                  6  2'Finish Dt:'
+     A            WDWFNSHMM      2Y 0B  6 13DSPATR(HI)
+     A                                      EDTCDE(4)
+     A            WDWFNSHDD      2Y 0B  6 16DSPATR(HI)
+     A                                      EDTCDE(4)
+     A            WDWFNSHYY      4Y 0B  6 19DSPATR(HI)
+     A                                      EDTCDE(4)
+     A                                  6 25'(MMDDYYYY)'
+     A                                 11  1'F12=Cancel'
+     A                                      COLOR(BLU)
+     A            WDWMSG        45A  O 12  1DSPATR(HI)
+      **************************************************************************
+     A          R WRNWDW
+     A                                      WINDOW(*DFT 8 45)
+     A                                      OVERLAY
+     A                                  3  3'Warning - Item'
+     A                                      DSPATR(HI)
+     A            WDWITMNUM R        O  3 18REFFLD(ITMNUM)
+     A                                      DSPATR(HI)
+      * 3  6'Warning - This Item requires a quo-
+      * te.'
+     A                                  3 27'requires a quote.'
+     A                                      DSPATR(HI)
+     A                                  5  6'Please verify before continuing!!!'
+     A                                      DSPATR(HI)
+     A                                  7  1'Hit Enter to Continue'
+     A                                      COLOR(BLU)
+     A*%%RS+<record-sequences>
+     A*%%RS+ <sequence name="Main">
+     A*%%RS+  <device type="display" width="132" height="27" />
+     A*%%RS+  <record-write record-format="SFL1" />
+     A*%%RS+  <record-write record-format="SFLCTL1" />
+     A*%%RS+  <record-write record-format="MESSAGE" />
+     A*%%RS+ </sequence>
+     A*%%RS </record-sequences>

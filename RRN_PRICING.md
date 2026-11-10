@@ -1,5 +1,10 @@
 # RRN screens: suggested price on the re-run approval screens
 
+**The full members, with these edits and the ones in `RRN_FLAGS.md` already applied, are in the
+repo: `IVSORRMKT.dds`, `IVRORRMKT.rpgle`, `IVSORRMKTC.dds`, `IVRORRMKTC.rpgle`.**
+They were rebuilt from the SEU listings of 11/09/26. Copy them over the H33979 members
+instead of making the edits by hand.
+
 The re-run repricing suggestion moves onto the existing online re-run (RRN)
 screens, so marketing decides the re-run quantity and the price together, in
 one place, with the sales, price and stock figures those screens already show.

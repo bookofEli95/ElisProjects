@@ -1,0 +1,260 @@
+      **************************************************************************
+      * IVSORRMKTC
+      * Online Rerun System: Marketing Change screen
+      **************************************************************************
+      *
+      **************************************************************************
+      * File Information
+      *-------------------------------------------------------------------------
+      *
+      **************************************************************************
+      *
+      **************************************************************************
+      * File History
+      *-------------------------------------------------------------------------
+      * Project   Date   Int Description
+      * ------- -------- --- ---------------------------------------------------
+      * H33979  11/10/26 EFI Show the suggested price; add printed price and
+      *                      3rd party approval flags (SOS-2092, SOS-2520)
+      * H26932  07/12/22 KMS Add field to adjust code price on Milwaukee rerun
+      *                       screens - Add a check for price changes to promp
+      *                      t a code price change to so they dont forget to d
+      *                      o it
+      * H26932  07/11/22 KMS Add field to adjust code price on Milwaukee rerun
+      *                       screens - Changing the code price spot on screen
+      * H26932  07/05/22 KMS Add field to adjust code price on Milwaukee rerun
+      *                       screens - Change approval screen to show all inf
+      *                      ormation thats on MKTC screen
+      * H26932  06/29/22 KMS Add field to adjust code price on Milwaukee rerun
+      *                       screens
+      * H26932  03/01/22 KMS Add field to adjust code price on Milwaukee rerun
+      *                       screens - Add ability to enter code prices on ch
+      *                      ange screen for IVRORRMKT
+      * MISC    03/17/21 SRK Source Error
+      * FIX     06/20/19 CMN Change which field it first goes to
+      * H16167  06/14/19 CMN Clear the MINQTYUSG field='Y' on all POP/NOP item
+      *                      s, & other items as appropriate.
+      * FIX     12/14/15 CMN Move fields so Approved rerun qty is where the cu
+      *                      rsor initially star
+      * 10747  12/12/15 SMM  e would like an option on the Milw screens that w
+      *                      ould allow them tolag if an item should now be PO
+      *                      D.
+      * ISC3   10/29/14 SRK  ource Cleanup
+      * 22027  11/15/09 CMN  CS] Increase size of price field
+      * 23025  03/21/09 CMN  DP] fix ORR - field size too small
+      * 21794  03/11/09 TRO  DP] Online Rerun - create new Purchasing screen
+      * 21794  03/10/09 CMN  DP] Online Rerun - create new Purchasing screen
+      * 21794  02/24/09 TRO  DP] Online Rerun - create new Purchasing screen
+      * A00644 09/27/04 KCS  nline Rerun System: Marketing approvals
+      **************************************************************************
+     A                                      DSPSIZ(24 80 *DS3)
+     A                                      REF(FIELD_REF)
+     A                                      WDWBORDER((*COLOR WHT))
+     A                                      VLDCMDKEY(26 'Valid Cmd keys')
+     A                                      CF01(01)
+     A                                      CF02(02)
+     A                                      CA03(03)
+     A                                      CF04(04)
+     A                                      CF05(05 'Calculate')
+     A                                      CF06(06)
+     A                                      CF07(07)
+     A                                      CF08(08)
+     A                                      CF09(09)
+     A                                      CF10(10)
+     A                                      CF11(11 'Accept')
+     A                                      CA12(12 'Cancel')
+     A                                      CF13(13)
+     A                                      CF14(14)
+     A                                      CF15(15)
+     A                                      CF16(16)
+     A                                      CF17(17)
+     A                                      CF18(18)
+     A                                      CF19(19)
+     A                                      CF20(20)
+     A                                      CF21(21)
+     A                                      CF22(22)
+     A                                      CF23(23)
+     A                                      CF24(24)
+     A                                      HELP(25 'Instructions')
+     A                                      CSRINPONLY
+      **************************************************************************
+      **************************************************************************
+      **************************************************************************
+     A          R SCREEN1
+     A            TTLDATE   R        O  1  2TEXT('Screen Title Date')
+     A                                      DSPATR(HI)
+     A                                      COLOR(BLU)
+     A                                      DATFMT(*USA)
+     A            TTLTEXT   R        O  1 13DSPATR(HI)
+     A                                      COLOR(BLU)
+     A                                      DSPATR(RI)
+     A            TTLPGM    R        O  1 71REFFLD($PGM)
+     A                                      DSPATR(HI)
+     A                                      COLOR(BLU)
+     A            TTLLINE2  R        O  2  2DSPATR(HI)
+     A                                      DSPATR(UL)
+     A                                      COLOR(BLU)
+     A                                  4  2'Item#:'
+     A            ITMNUM    R        O  4  9DSPATR(HI)
+     A            SDESC     R        O  4 18DSPATR(HI)
+     A                                  4 50'Qty Avl:'
+     A            QTYAVAIL  R        O  4 59DSPATR(HI)
+     A                                      EDTCDE(L)
+     A                                  5 10'Start Date:'
+     A            STARTDT   R        O  5 22TEXT('Start Date')
+     A                                      DSPATR(HI)
+     A                                      DATFMT(*USA)
+     A                                      MAPVAL(('01/01/0001' *BLANK))
+     A                                  5 46'Calc MinQty:'
+     A            MINQTY    R    7   O  5 59DSPATR(HI)
+     A                                  6  8'Est B/O Date:'
+     A            ESTBODT   R        O  6 22TEXT('Estimated Back Order Date')
+     A                                      DSPATR(HI)
+     A                                      DATFMT(*USA)
+     A                                      MAPVAL(('01/01/0001' *BLANK))
+     A                                  6 49'B.O. Qty:'
+     A            BOQTY     R        O  6 59DSPATR(HI)
+     A                                  7  5'Milwaukee Coord:'
+     A            MKTCOORD  R        O  7 22DSPATR(HI)
+     A                                 13  5'Minqty Override:'
+     A            MINQTYOVR R        B 13 22REFFLD(QTYAVAIL)
+     A  57                                  DSPATR(RI)
+     A  57                                  DSPATR(PC)
+     A  57                                  COLOR(RED)
+     A                                      DSPATR(HI)
+     A                                      EDTCDE(1)
+     A N51                                  DSPATR(UL)
+     A  51                                  DSPATR(PR)
+     A                                 13 32'Force MinQty Override?:'
+     A            MINQTYUSG      1   B 13 56DSPATR(HI)
+     A  54                                  DSPATR(RI)
+     A  54                                  DSPATR(PC)
+     A  54                                  COLOR(RED)
+     A N51                                  DSPATR(UL)
+     A  51                                  DSPATR(PR)
+     A                                  8  4'Estimated RR Qty:'
+     A            ESTRRQTY  R        O  8 22REFFLD(ESTRRQTY)
+     A                                      DSPATR(HI)
+     A                                      EDTCDE(3)
+     A                                  8 42'Approved RR Qty:'
+     A            APPRRQTY  R        B  8 59DSPATR(HI)
+     A  55                                  DSPATR(RI)
+     A  55                                  COLOR(RED)
+     A N52                                  DSPATR(UL)
+     A                                      CHECK(FE)
+     A                                      CHECK(RB)
+     A                                      EDTCDE(Q)
+     A N70
+     AO 55                                  DSPATR(PC)
+     A  52                                  DSPATR(PR)
+     A                                  9  2'# of Months to Run:'
+     A            NUMMONTHS      2Y 0B  9 22DSPATR(HI)
+     A  50                                  DSPATR(RI)
+     A  50                                  DSPATR(PC)
+     A  50                                  COLOR(RED)
+     A                                      CHECK(FE)
+     A                                      CHECK(RB)
+     A                                      EDTCDE(Z)
+     A N51                                  DSPATR(UL)
+     A  51                                  DSPATR(PR)
+     A                                  9 39'Calculated RRN Qty:'
+     A            CALCRRQTY      7Y 0O  9 59DSPATR(HI)
+     A                                      EDTCDE(Z)
+     A                                 10  3'Current Price:'
+     A            PRICE72   R     Y  O 10 18
+     A                                      DSPATR(HI)
+     A                                      EDTCDE(M)
+     A                                 10 28'New Price:'
+     A            NEWPRICE  R     Y  B 10 39REFFLD(PRICE72)
+     A  56                                  DSPATR(RI)
+     A  56                                  DSPATR(PC)
+     A  56                                  COLOR(RED)
+     A                                      DSPATR(HI)
+     A                                      CHECK(FE)
+     A                                      CHECK(RB)
+     A                                      EDTCDE(M)
+     A N51                                  DSPATR(UL)
+     A  51                                  DSPATR(PR)
+     A                                 11  9'Quote:'
+     A            QUOTEPRC  R     Y  B 11 16REFFLD(PRICE72)
+     A  58                                  DSPATR(RI)
+     A  58                                  DSPATR(PC)
+     A  58                                  COLOR(RED)
+     A                                      DSPATR(HI)
+     A                                      CHECK(FE)
+     A                                      CHECK(RB)
+     A                                      EDTCDE(M)
+     A N51                                  DSPATR(UL)
+     A  51                                  DSPATR(PR)
+     A                                 11 27'Quoted Date:'
+     A            QUOTEDT   R        O 11 40TEXT('Quoted Price Date')
+     A                                      DSPATR(HI)
+     A                                      DATFMT(*USA)
+     A                                      MAPVAL(('01/01/0001' *BLANK))
+     A                                 12 10'Who Quoted?'
+     A            QUOTEWHO  R        O 12 22DSPATR(HI)
+     A  63                             12 33'Suggested:'
+     A            SUGPRICE       7Y 2O 12 44EDTCDE(M)
+     A                                      DSPATR(HI)
+     A                                      COLOR(PNK)
+     A            SUGNOTE       27A  O 12 54COLOR(PNK)
+     A                                  7 46'Flip to POD:'
+     A            FLIPTOPOD      1A  B  7 59DSPATR(HI)
+     A  59                                  DSPATR(RI)
+     A  59                                  DSPATR(PC)
+     A  59                                  COLOR(RED)
+     A N51                                  DSPATR(UL)
+     A  51                                  DSPATR(PR)
+     A                                 14  9'Email Date:'
+     A            EMAILDATE R        O 14 22TEXT('Email Date')
+     A                                      DSPATR(HI)
+     A                                      DATFMT(*USA)
+     A                                      MAPVAL(('01/01/0001' *BLANK))
+     A                                 14 37'Emailed to:'
+     A            EMAILEDTO     30A  O 14 49DSPATR(HI)
+     A                                 15  9'WIP Comment:'
+     A            WPCOMT        30A  O 15 22DSPATR(HI)
+     A                                 15 53'Prt Price:'
+     A            PRTPRC         1A  B 15 64VALUES(' ' 'Y' 'N' 'S')
+     A                                      DSPATR(HI)
+     A N51                                  DSPATR(UL)
+     A  51                                  DSPATR(PR)
+     A                                 15 66'3rd Pty:'
+     A            TPAPRV         1A  B 15 75VALUES(' ' 'Y' 'N')
+     A                                      DSPATR(HI)
+     A N51                                  DSPATR(UL)
+     A  51                                  DSPATR(PR)
+     A                                 10 51'Codpr1:'
+     A            CODPR172       7  2O 10 59EDTCDE(M)
+     A                                      DSPATR(HI)
+     A                                 16 14'Agency:'
+     A            OWNER@    R        O 16 22DSPATR(HI)
+     A                                 11 51'Codpr2:'
+     A            CODPR272       7  2B 11 59EDTCDE(M)
+     A                                      DSPATR(HI)
+     A                                 17  3'Comments'
+     A            NOTE1         75A  B 18  3DSPATR(HI)
+     A                                      CHECK(LC)
+     A            NOTE2         75A  B 19  3DSPATR(HI)
+     A                                      CHECK(LC)
+     A            NOTE3         75A  B 20  3DSPATR(HI)
+     A                                      CHECK(LC)
+     A            NOTE4         75A  B 21  3DSPATR(HI)
+     A                                      CHECK(LC)
+     A                                 23  2'F5=Calculate'
+     A                                      COLOR(BLU)
+     A                                 23 16'F12=Cancel'
+     A                                      COLOR(BLU)
+     A            MSG       R        O 24  2REFFLD($MSG)
+     A  70                                  DSPATR(RI)
+     A  70                                  COLOR(RED)
+     A                                      DSPATR(HI)
+     A  80                             11 69'Codpr2?:'
+     A  80                                  DSPATR(RI)
+     A  80                                  COLOR(RED)
+     A  80                             10 69'Need'
+     A  80                                  DSPATR(RI)
+     A  80                                  COLOR(RED)
+     A  80        CODPR272F      1A  B 11 78DSPATR(HI)
+     A  80                                  DSPATR(RI)
+     A  80                                  COLOR(RED)
