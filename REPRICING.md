@@ -78,6 +78,18 @@ prices from the back of books: SOS-2092 (a field saying whether a product has a
 printed price), SOS-2520 (a field saying whether a price change needs third-party
 approval) and BS-1572 (changes to ISBN and QR code generation).
 
+## Live in production (11 Nov 2026)
+
+Promoted to OBJECT on 11 Nov 2026. Catalogue **4120 (Concert Band)** is live at
+phase 1: the first run (cycle 202611, 13:46) raised 102 band-set suggestions and
+attached a "Price review pending (IVRRPC)" correction to each. Marketing decides
+them on the RRN screens. No other catalogue is switched on yet:
+
+- Pop, Classical, Self-Teach: approved by Paul, need their `DIVCAT` rows.
+- Education: stays at 0 until the exclusions (Faber, Digital Agency, 2025 EE,
+  legacy EE, EE caps) are in the rules.
+- Choral: stays at 0 until Paul answers the table questions.
+
 ## One screen for re-run quantity and price (9 Nov 2026)
 
 Marketing asked for the price decision to be made on the existing re-run
