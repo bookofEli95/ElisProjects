@@ -7,38 +7,7 @@
       //**********************************************************************
       // Program Information
       // ------------------------------------------------------------------
-      // Carries out actioned repricing suggestions and releases the CNO.
-      // By default an approved price is staged on the re-run queue as
-      // IVPORRITM.NEWPRICE, where production already looks for it, rather
-      // than written to the item - see Sbr_Apply. This is the only
-      // program in the process that writes a price anywhere, so every
-      // price movement passes through one place and leaves one trail.
-      //
-      // What it acts on:
-      //
-      //   RPCSTAT 'A'  approved - the suggested price is applied
-      //   RPCSTAT 'O'  overridden - the editor's price is applied, once
-      //                it has passed the catalogue guardrails
-      //   RPCSTAT 'S'  only in mode 'M', and only for a phase 2
-      //                catalogue, which is what "applies automatically"
-      //                means
-      //
-      // What it refuses:
-      //
-      //   A suggestion whose item price has moved since it was made is
-      //   rejected, not applied. The number was worked out from a price
-      //   that no longer exists, so applying it would silently reprice
-      //   from a base nobody reviewed.
-      //
-      //   An override past the catalogue cap is held, not applied,
-      //   unless the editor accepted the breach (RPCOVRAUT).
-      //
-      // Expiry matters as much as applying. A suggestion nobody acts on
-      // would otherwise keep its CNO attached for ever, and the CNO stops
-      // the book being reprinted at the old price - so an abandoned
-      // review would quietly block production. Past RPCEXPCY cycles the
-      // suggestion is expired and the CNO released, which also lets the
-      // next run raise it again rather than forget it.
+      // Applies approved suggestions, releases CNOs and expires old ones.
       //**********************************************************************
 
       //**********************************************************************
@@ -50,9 +19,7 @@
       // RPCSUG  09/21/26 EFI Create re-run repricing apply and expire
       //**********************************************************************
 
-      // Files are opened through the library list, with no library
-      // named, so the same program reads a test library when that is
-      // ahead of OBJECT in the list, and OBJECT in production.
+      // Files resolve through the library list (no library named).
 
       // Input Files
      FIVPRPCCTL IF   E           K DISK
@@ -84,13 +51,9 @@
       //**********************************************************************
       // Data Structures & Variables
       //**********************************************************************
-      // The shared program status data structure - SdsUser and
-      // SdsProgram come from here, as in every other program in this
-      // library. A hand-rolled structure named SdsUser resolves to
-      // positions 1-10, the program name, not the user profile.
+      // Program status DS (SdsUser, SdsProgram).
       /copy qcopysrc,statusds
-      // Price propagation to the related item and every eBook - see
-      // Sbr_Apply_Item.
+      // Passes the new price on to the related item and eBooks.
       /copy qcopysrc,ivrudrlitm
 
       // Entry parameters
@@ -129,10 +92,7 @@
      D WrkStsTok       S             10A   Inz(*Blanks)
      D WrkPrmItm       S              8A   Inz(*Blanks)
 
-      // One page of the item note pad. A NOTEPADI record is a page, not a
-      // note: NOTE1 and NOTE2 together are 13 lines of 34 characters, and
-      // one page holds several corrections one after another. This is the
-      // same overlay IVRICNO and IVRCNOUPD use (their Tablet structure).
+      // One note pad page: 13 lines of 34 characters, as in IVRICNO.
      D WrkPad          DS
      D  WrkPart1               1    256
      D  WrkPart2             257    442
@@ -149,11 +109,7 @@
      D WrkCntCno       S             10I 0 Inz(0)
      D WrkCntCnoFull   S             10I 0 Inz(0)
      D WrkPrmPrc       S              8A   Inz(*Blanks)
-      // The new price in the same type as IVPORRITM.NEWPRICE, so %Char of
-      // it is character for character what IVRORRNEWP scans a note for.
-      // Formatting it from a field of a different length or scale could
-      // produce 13.9900 where the report looks for 13.99, or the reverse,
-      // and the report would then print a change the note already covers.
+      // Same type as NEWPRICE so %Char matches what IVRORRNEWP scans.
      D WrkCnoPrc       S                   Like(ORR_NEWPRICE) Inz(0)
      D WrkNote         S             60A   Inz(*Blanks)
      D WrkFld          S             10A   Inz(*Blanks)
@@ -182,11 +138,8 @@
       //***********************************************************************
       //* Entry Parameters
       //***********************************************************************
-      // PrmMode   'A' applies what editors have actioned.
-      //           'M' is the monthly run: the same, plus auto-apply for
-      //               phase 2 catalogues, plus expiry.
-      //           Anything else, or no parameter, behaves as 'A'.
-      // PrmCycle  A single cycle YYYYMM, or blank for every open cycle.
+      // PrmMode  'A' apply decisions, 'M' monthly (adds phase 2, expiry)
+      // PrmCycle YYYYMM, or blank for every open cycle
       //***********************************************************************
      C     *ENTRY        PLIST
      C                   PARM                    PrmMode
@@ -199,15 +152,7 @@
 
          Exsr Sbr_Init;
 
-         // Everything still open, oldest cycle first so that if two
-         // cycles are somehow open for one item the older is settled
-         // first.
-         //
-         // Rejected rows are included while they still hold a CNO. An
-         // editor rejecting a suggestion does not release it there,
-         // because then three programs would be able to change a CNO;
-         // instead the row is picked up here once, the CNO is released,
-         // RPCCNOFL goes to 'N' and it drops out of this cursor for good.
+         // Open suggestions, plus rejected ones still holding a CNO.
          Exec SQL
             DECLARE CsrSug CURSOR FOR
                SELECT ITMNUM, RPCCYCL
@@ -287,8 +232,7 @@
             WrkNote   = *Blanks;
             WrkNew72  = 0;
 
-            // Read for update. The cursor gave a key rather than the row
-            // so the record is locked here and nowhere else.
+            // Read for update; the lock is taken here only.
             Chain (WrkSugItem : WrkSugCycl) IVPRPCSUG;
             If Not %Found(IVPRPCSUG);
                WrkCntSkip += 1;
@@ -306,17 +250,7 @@
                Endif;
             Endif;
 
-            // Does an approved price go straight on to the item, or wait
-            // on the re-run queue for the reprint? Straight on only when
-            // the catalogue says so (RPCAPLTGT 'I'), or when it goes by
-            // the printed-price flag ('P') and the title is known to have
-            // no printed price (IVPPRTPRT.PRTPRC 'N'). Anything printed,
-            // stickered or not known waits: the copies in stock carry the
-            // old price until the new ones exist.
-            //
-            // The same record says whether the title is known not to need
-            // third-party approval (TPAPRV 'N'). Phase 2 only applies a
-            // price by itself for those - see the Select below.
+            // Direct to the item if target 'I', or 'P' with no printed price.
             WrkDirect = 'N';
             WrkTpaNo  = 'N';
             Chain (WrkSugItem) IVPPRTPRT;
@@ -332,14 +266,7 @@
                WrkDirect = 'Y';
             Endif;
 
-            // Every open suggestion gets its correction note (CNO) the
-            // first time it passes through here - which, in the monthly
-            // job, is minutes after IVRRPCGEN raised it. Held rows get one
-            // too: a title waiting on a pricing-authority check is exactly
-            // one that must not be reprinted at the old price meanwhile.
-            //
-            // Not for a title whose price goes straight on: nothing is
-            // printed on it, so there is nothing to warn production about.
+            // Attach a CNO to open suggestions, unless the price goes direct.
             If CTL_RPCCNOYN = 'Y' And SUG_RPCCNOFL <> 'Y'
                And WrkDirect = 'N'
                And ( SUG_RPCSTAT = 'S' Or SUG_RPCSTAT = 'G'
@@ -355,10 +282,7 @@
             When SUG_RPCSTAT = 'O';
                WrkAction = 'O';
                WrkNew72  = SUG_RPCAPP72;
-            // Phase 2 applies a suggestion with no editor involved, so
-            // only for a title known not to need third-party approval.
-            // A title that has not been checked waits for an editor like
-            // any phase 1 suggestion.
+            // Phase 2 only auto-applies titles known not to need 3rd party OK.
             When SUG_RPCSTAT = 'S' And WrkMode = 'M'
                                    And CTL_RPCPHASE = '2'
                                    And WrkTpaNo = 'Y';
@@ -376,15 +300,13 @@
                Leavesr;
             Endif;
 
-            // Anything not being applied is a candidate for expiry, so
-            // that an abandoned review cannot hold its CNO for ever.
+            // Anything not applied is checked for expiry.
             If WrkAction = 'X';
                Exsr Sbr_Consider_Expiry;
                Leavesr;
             Endif;
 
-            // The item still has to exist. Read without a lock: only the
-            // 'I' apply path writes the item, and it takes its own lock.
+            // The item must still exist.
             Chain(N) (WrkSugItem) IVPITEMS;
             If Not %Found(IVPITEMS);
                WrkNote = 'ITEM NOT ON IVPITEMS';
@@ -393,10 +315,7 @@
                Leavesr;
             Endif;
 
-            // The price the suggestion was worked out from must still be
-            // the price on the item. If it is not, somebody has repriced
-            // in the meantime and this number is answering a question
-            // about a price that no longer exists.
+            // Reject if the item price changed since the suggestion.
             If ITM_PRICE72 <> SUG_RPCCUR72;
                WrkNote = 'PRICE CHANGED SINCE THE SUGGESTION WAS MADE';
                Exsr Sbr_Reject;
@@ -412,8 +331,7 @@
                Leavesr;
             Endif;
 
-            // An override is checked against the guardrails of the rule
-            // that produced the suggestion.
+            // Check an override against the rule's guardrails.
             If WrkAction = 'O';
                Exsr Sbr_Check_Override;
                If WrkBreach = 'Y';
@@ -441,10 +359,7 @@
       /free
          Begsr Sbr_Check_Override;
 
-            // The rule that produced the suggestion is read back by the
-            // key recorded on it, so an override is judged against the
-            // guardrail that was in force when the number was made, not
-            // whatever the rule table says today.
+            // Read the rule that produced the suggestion.
             WrkBreach = 'N';
             WrkRulFnd = 'N';
 
@@ -467,9 +382,7 @@
                Endif;
             Endif;
 
-            // The guardrail is advisory: an editor may go past it, but
-            // only on purpose. Accepting the breach is recorded on the
-            // suggestion, against the editor who accepted it.
+            // A breach the editor accepted (RPCOVRAUT) is allowed.
             If WrkBreach = 'Y' And SUG_RPCOVRAUT = 'Y';
                WrkBreach = 'N';
             Endif;
@@ -491,18 +404,7 @@
       /free
          Begsr Sbr_Apply;
 
-            // Where an approved price goes is control data (RPCAPLTGT):
-            //
-            //   Q  staged on the re-run queue as IVPORRITM.NEWPRICE. This
-            //      is the default, and the house process: IVRORRNEWP
-            //      treats NEWPRICE as a price change waiting for the new
-            //      printing and reports it to production. PRICE72 moves
-            //      when the new printing does, through whatever moves it
-            //      today - so the system price never runs ahead of the
-            //      price printed on the copies still in stock.
-            //
-            //   I  written straight to IVPITEMS. For a phase in which the
-            //      price is no longer printed on the book.
+            // RPCAPLTGT: stage on the queue (NEWPRICE) or write to the item.
             WrkApplied = 'N';
 
             If WrkDirect = 'Y';
@@ -517,9 +419,7 @@
 
             Exsr Sbr_Write_Audit;
 
-            // Staged: the pending note becomes the price note for the
-            // reprint. Applied to the item: the price has already
-            // changed, so any pending note is simply removed.
+            // Staged: turn the note into a price note. Direct: remove it.
             If WrkDirect = 'Y';
                Exsr Sbr_Release_CNO;
             Else;
@@ -559,16 +459,10 @@
 
             WrkAudAct = 'Reprice staged';
 
-            // Read for update: this row is the one being written. By
-            // both key fields - the item has a row per re-run, and the
-            // suggestion records which one it was raised against.
+            // Read the queue row for update.
             Exsr Sbr_Chain_Queue;
 
-            // No queue row, so nowhere for a pending price to wait. The
-            // row can go between suggestion and approval - IVRORRCLN's
-            // satellites show items leave the queue routinely - so this
-            // is checked here even though IVRRPCGEN will not raise a
-            // suggestion for an item without one.
+            // No queue row: nowhere to stage the price.
             If WrkQueFnd = 'N';
                WrkNote = 'NO RE-RUN QUEUE ROW TO CARRY THE NEW PRICE';
                Exsr Sbr_Reject;
@@ -576,12 +470,7 @@
                Leavesr;
             Endif;
 
-            // The title has since been marked not to be reprinted, or
-            // taken off the queue. A pending price on a book that is not
-            // going to press is noise for production.
-            //
-            // Matched as a whole token, spaces included, so that a status
-            // of 'A' or 'K' cannot match inside *BLANK.
+            // Reject if the title is no longer being rerun.
             If ORR_RERUNSTS = ' ';
                WrkStsTok = '*BLANK';
             Else;
@@ -597,9 +486,7 @@
                Leavesr;
             Endif;
 
-            // Somebody has put a different new price on the queue since
-            // the suggestion was made. A person's decision stands over
-            // this one, so it is not overwritten.
+            // Don't overwrite a different new price someone else set.
             If ORR_NEWPRICE <> 0 And ORR_NEWPRICE <> SUG_RPCCUR72
                And ORR_NEWPRICE <> WrkNew72;
                Unlock IVPORRITM;
@@ -610,16 +497,11 @@
                Leavesr;
             Endif;
 
-            // Only NEWPRICE is written back, so nothing else on a row the
-            // production screens are using can be undone.
+            // Write back NEWPRICE only.
             ORR_NEWPRICE = WrkNew72;
             Update IV$ORRITM %Fields(ORR_NEWPRICE);
 
-            // No IVPMAINT row here, on purpose: the list price has not
-            // moved yet. A 'PRICE72' row now would tell IVRRPCGEN the
-            // title had just been repriced, and it would restart the
-            // eligibility clock on a price nobody has printed. The row
-            // gets written by whatever moves PRICE72 at the new printing.
+            // No IVPMAINT row: PRICE72 hasn't changed yet.
             WrkApplied = 'Y';
             WrkCntStaged += 1;
 
@@ -648,18 +530,12 @@
 
             ITM_PRICE72 = WrkNew72;
 
-            // PRICE112 takes the same number, not a separately worked
-            // out one. IVRMAINT2 sets Itm_PRICE72 and Itm_PRICE112 from
-            // the one price an editor types, and IVRPRCUPD does the same
-            // from the uploaded MSRP, so they are one price in two
-            // fields and must not be allowed to drift apart here.
+            // PRICE112 takes the same price.
             If CTL_RPCP112YN = 'Y';
                ITM_PRICE112 = WrkNew72;
             Endif;
 
-            // Only the price fields are written back, the way IVRMAINT2
-            // and IVRPRCUPD do it, so a full-record update cannot undo
-            // another job's change to an unrelated field.
+            // Update the price fields only.
             Update IVPITEM$ %Fields(ITM_PRICE72 : ITM_PRICE112);
 
             // One audit row per field that actually moved.
@@ -675,17 +551,7 @@
                Exsr Sbr_Write_Maint;
             Endif;
 
-            // The related item and every eBook follow a hardgood's price,
-            // and in this library that is IVRUDRLITM's job: IVRMAINT's
-            // history reads "Remove Subroutine for eBook price update,
-            // now done in IVRUDRLITM". It gives the related item the same
-            // price and each eBook the same price - less 20% for an HL
-            // digital book - and writes their IVPMAINT rows. Without it
-            // the eBooks would keep the old price.
-            //
-            // If IVPITEMS turns out to carry a trigger that already calls
-            // it, this call only adds a duplicate audit row for the
-            // related item; eBooks at the right price are left alone.
+            // Pass the new price on to the related item and eBooks.
             WrkPrmItm = %Editc(WrkSugItem : 'X');
             WrkPrmPrc = %Char(WrkNew72);
             Callp IVRUDRLITM(WrkPrmItm : WrkPrmPrc);
@@ -701,9 +567,7 @@
       /free
          Begsr Sbr_Reject;
 
-            // Rejecting releases the CNO. The reason the book was held
-            // back has gone away, so holding production back with it
-            // would be wrong.
+            // Rejecting releases the CNO.
             Exsr Sbr_Release_CNO;
 
             SUG_RPCSTAT  = 'R';
@@ -745,9 +609,7 @@
 
             WrkOldStat = SUG_RPCSTAT;
 
-            // Cycles are YYYYMM, so compare them as a count of months.
-            // Integer divide on purpose: a decimal divide here would
-            // put the month count out by the fraction of a year.
+            // Age in months between cycles (integer divide on purpose).
             WrkMthSug = (%Div(%Int(SUG_RPCCYCL) : 100) * 12)
                       + %Rem(%Int(SUG_RPCCYCL) : 100);
             WrkMthCur = (%Div(%Int(WrkCurCycl) : 100) * 12)
@@ -760,10 +622,7 @@
                Leavesr;
             Endif;
 
-            // Past its window the suggestion is expired and the CNO
-            // released, which also lets the next generator run raise it
-            // again - the title is not forgotten, it goes back in the
-            // queue with a fresh number.
+            // Expire it and release the CNO; the next run can raise it again.
             Exsr Sbr_Release_CNO;
 
             If WrkOldStat = 'G';
@@ -787,36 +646,19 @@
       /free
          Begsr Sbr_Attach_CNO;
 
-            // A correction note (CNO) is written exactly as an editor's is
-            // in IVRICNO, and as IVRCNOUPD writes mass corrections: a
-            // header line "Correction MM/YY <name>", then body lines of at
-            // most 34 characters, placed in the first gap on the first page
-            // with room, after one blank separator line. Nothing already on
-            // the page moves. Because it is the item's pop-up note pad,
-            // anyone who opens the item sees it - which is the alert the
-            // release asks for.
-            //
-            // The second line carries "(IVRRPC)". That marker is how this
-            // program finds its own four lines again, and the only lines it
-            // will ever change. If an editor removes it, the note is theirs.
+            // Write a CNO the IVRICNO way; the (IVRRPC) marker finds it again.
             Exsr Sbr_Cno_Find;
             If WrkCnoPg = 0;
                Exsr Sbr_Cno_Gap;
             Endif;
 
-            // No room on any of the four pages. Nobody else's correction is
-            // moved to make some. The suggestion goes ahead without one,
-            // and once a price is staged IVRORRNEWP reports it to
-            // production anyway, since no note carries it.
+            // No room on any page: go ahead without a CNO.
             If WrkCnoPg = 0 Or WrkCnoLn > 10;
                WrkCntCnoFull += 1;
                Leavesr;
             Endif;
 
-            // No price in these lines, deliberately. IVRORRNEWP treats a
-            // change as covered when a note holds the word PRICE and the
-            // text of NEWPRICE anywhere in it, so any number here could
-            // later match a different NEWPRICE and hide it from production.
+            // No price in the pending lines, so IVRORRNEWP can't mis-match.
             Exsr Sbr_Cno_Header;
             WrkLin(WrkCnoLn)     = WrkHdr;
             WrkLin(WrkCnoLn + 1) = 'Price review pending (IVRRPC)';
@@ -829,8 +671,7 @@
             SUG_RPCCNORCD = WrkCnoPg;
             WrkCntCno += 1;
 
-            // Save the flag now, then take the lock back: every path after
-            // this one ends in an Update or an Unlock of the suggestion.
+            // Save the flag, then re-lock the suggestion.
             Update IV$RPCSUG;
             Chain (WrkSugItem : WrkSugCycl) IVPRPCSUG;
 
@@ -843,8 +684,7 @@
       /free
          Begsr Sbr_Release_CNO;
 
-            // Blank this process's four lines and nothing else on the page,
-            // then tidy up the way IVRICNO does when a note is removed.
+            // Blank this process's four lines only, then tidy up.
             If SUG_RPCCNOFL = 'Y';
                Exsr Sbr_Cno_Find;
                If WrkCnoPg > 0;
@@ -872,19 +712,7 @@
       /free
          Begsr Sbr_Price_CNO;
 
-            // Once a price is decided the same four lines are rewritten as
-            // the correction an editor would type: the word PRICE and the
-            // new price on one line. That is what IVRORRNEWP recognises as
-            // a change production already knows about (history: "Skip
-            // printing price change if correction note was added"), so the
-            // item is not reported twice. The note then stays, like any
-            // other CNO - it is the instruction for the reprint.
-            //
-            // The price line must not be line 8 of the page: NOTE1 ends
-            // part-way through it, and IVRORRNEWP scans NOTE1 and NOTE2
-            // separately, so a price split across them would not be found.
-            // Sbr_Cno_Gap never places a block that way; one an editor has
-            // moved there only costs a duplicate line on that report.
+            // Rewrite the note with PRICE and the new price, for IVRORRNEWP.
             If SUG_RPCCNOFL <> 'Y';
                Leavesr;
             Endif;
@@ -915,9 +743,7 @@
       /free
          Begsr Sbr_Cno_Find;
 
-            // By its marker line rather than a stored line number, so it is
-            // still found if an editor has added or removed lines above it.
-            // The header is the line before the marker.
+            // Find this process's block by its (IVRRPC) marker line.
             WrkCnoPg = 0;
             WrkCnoLn = 0;
             For WrkPg = 1 To 4;
@@ -943,11 +769,7 @@
       /free
          Begsr Sbr_Cno_Gap;
 
-            // The first place, page by page, where four lines are free and
-            // the line above is blank (or it is the top of the page) - the
-            // rule IVRICNO and IVRCNOUPD follow, except that all four lines
-            // must actually be free: IVRCNOUPD only checks two at the top
-            // of a page and can write over text below them.
+            // First gap of four free lines after a blank line.
             WrkCnoPg = 0;
             WrkCnoLn = 0;
             For WrkPg = 1 To 4;
@@ -1000,8 +822,7 @@
       /free
          Begsr Sbr_Cno_Save;
 
-            // WrkPad still holds the page Sbr_Cno_Find or Sbr_Cno_Gap left
-            // it on, with this process's lines changed and nothing else.
+            // Write back the page with only this process's lines changed.
             Chain (WrkSugItem : WrkCnoPg) NOTEPADI;
             NTE_NOTE1 = WrkPart1;
             NTE_NOTE2 = WrkPart2;
@@ -1028,8 +849,7 @@
       /free
          Begsr Sbr_Cno_Header;
 
-            // Built exactly as IVRICNO and IVRCNOUPD build it, so a
-            // correction from this process reads like anyone else's.
+            // Header built the same way IVRICNO builds it.
             WrkName = WrkUser;
             Chain (WrkUser) MFPUSERS;
             If %Found(MFPUSERS);
@@ -1052,9 +872,7 @@
       /free
          Begsr Sbr_Cno_Flags_On;
 
-            // IVPORRITM.CNO is set to 'M' only if it was blank, as IVRICNO
-            // and IVRCNOUPD do. RPCCNOSET records that it was this process
-            // that set it, so that it only ever clears a flag it set.
+            // Set IVPORRITM.CNO only if blank; RPCCNOSET records that we did.
             Exsr Sbr_Chain_Queue;
             If WrkQueFnd = 'Y';
                If ORR_CNO = *Blanks;
@@ -1086,11 +904,7 @@
       /free
          Begsr Sbr_Cno_Tidy;
 
-            // IVRICNO's rule when a note is removed: if all four pages are
-            // now empty, delete the four records and clear CORRCD;
-            // otherwise the item still has corrections and CORRCD stays
-            // 'C'. The queue's CNO flag is cleared as well, but only when
-            // this process was the one that set it.
+            // If all four pages are empty, delete them and clear the flags.
             WrkEmpty = 'Y';
             For WrkPg = 1 To 4;
                Exsr Sbr_Cno_Load;
@@ -1136,24 +950,14 @@
       /free
          Begsr Sbr_Chain_Queue;
 
-            // IVPORRITM keeps a row per item per re-run, keyed ITMNUM +
-            // MINQTYDT (descending). The suggestion records which re-run
-            // it was raised against; by item alone the chain lands on the
-            // newest row, which need not be that one. No MINQTYDT
-            // (0001-01-01) means the title came from RERUN8 and has no
-            // queue row at all.
+            // Queue row by item + MINQTYDT; no MINQTYDT means no queue row.
             WrkQueFnd = 'N';
             If SUG_RPCMINQDT > D'0001-01-01';
                Chain (WrkSugItem : SUG_RPCMINQDT) IVPORRITM;
                If %Found(IVPORRITM);
                   WrkQueFnd = 'Y';
                Else;
-                  // The row can be re-keyed after the suggestion is made:
-                  // 4009212 was raised against 11/11/26 and two days later
-                  // its active row was 11/13/26. Fall back to the item's
-                  // newest row - the one the RRN change screen
-                  // (IVRORRMKTC) reads and writes New Price on - and
-                  // record it on the suggestion so later steps use it.
+                  // Row re-keyed since: fall back to the item's newest row.
                   Chain (WrkSugItem) IVPORRITM;
                   If %Found(IVPORRITM);
                      WrkQueFnd = 'Y';
@@ -1171,15 +975,7 @@
       /free
          Begsr Sbr_Write_Maint;
 
-            // FLDNAM has to be one of the names IVRRPCGEN looks for
-            // when it works out when a title was last repriced
-            // (RPCFLDLST), or this process cannot see its own history.
-            // 'PRICE72' and 'PRICE112' are what IVRPRCUPD writes for the
-            // same change, so these rows read the same as an upload's.
-            //
-            // COMMENT carries the program name, which is how IVRPRCUPD
-            // and IVRITEMSM4 make an audit row traceable to what wrote
-            // it.
+            // FLDNAM matches RPCFLDLST; COMMENT names the program.
             Clear IVPMAIN$;
             MNT_ITMNUM    = WrkSugItem;
             MNT_FLDNAM    = WrkFld;
@@ -1192,9 +988,7 @@
             MNT_REPCODE   = 'N';
             MNT_COMMENT   = 'IVRRPCAPL';
 
-            // MAINTNAME, the full name, as most history rows carry one.
-            // No RPG program fills it; the user's name from MFPUSERS,
-            // or the user ID when they are not on it.
+            // MAINTNAME: user's name from MFPUSERS, else the user ID.
             MNT_MAINTNAME = %Trim(WrkUser);
             Chain (WrkUser) MFPUSERS;
             If %Found(MFPUSERS);
