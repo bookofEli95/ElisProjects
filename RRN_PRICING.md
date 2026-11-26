@@ -68,10 +68,7 @@ New Price already on the queue row, accepts it, rewrites the correction note to
 the price note and marks the suggestion `X`; for `R` it releases the
 correction note. Suggestions nobody acts on still expire.
 
-One difference to know about: `IVRORRMKTC` reads the queue row by item number
-only (the newest row), while the suggestion records the row it was raised
-against (`RPCMINQDT`). For an item with two queue rows, `IVRRPCAPL` may stage
-the price on the older row as well. The price is the same either way.
+The change screen reads the queue row by item number only (the newest row), while the suggestion records the row it was raised against (`RPCMINQDT`). That row can be re-keyed later (4009212 went from 11/11/26 to 11/13/26), so when it is gone `IVRRPCAPL` falls back to the item's newest row - the same one the screen uses - and records it on the suggestion.
 
 ---
 

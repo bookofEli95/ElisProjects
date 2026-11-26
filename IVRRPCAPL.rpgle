@@ -46,6 +46,7 @@
       // ------------------------------------------------------------------
       // Project   Date     Int Description
       // ------- -------- --- ---------------------------------------------
+      // H33979  11/26/26 EFI Fall back to the item's newest queue row
       // RPCSUG  09/21/26 EFI Create re-run repricing apply and expire
       //**********************************************************************
 
@@ -1146,6 +1147,18 @@
                Chain (WrkSugItem : SUG_RPCMINQDT) IVPORRITM;
                If %Found(IVPORRITM);
                   WrkQueFnd = 'Y';
+               Else;
+                  // The row can be re-keyed after the suggestion is made:
+                  // 4009212 was raised against 11/11/26 and two days later
+                  // its active row was 11/13/26. Fall back to the item's
+                  // newest row - the one the RRN change screen
+                  // (IVRORRMKTC) reads and writes New Price on - and
+                  // record it on the suggestion so later steps use it.
+                  Chain (WrkSugItem) IVPORRITM;
+                  If %Found(IVPORRITM);
+                     WrkQueFnd = 'Y';
+                     SUG_RPCMINQDT = ORR_MINQTYDT;
+                  Endif;
                Endif;
             Endif;
 
